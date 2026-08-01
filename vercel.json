@@ -1,1 +1,1 @@
-{"rewrites": [{"source": "/:path*", "destination": "https://credible-artisans-app-zkl9jigjz3aqeupvjc8vhn.streamlit.app/:path*"}]} 
+{"cleanUrls": true} 
