@@ -27,6 +27,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Export for platforms like Vercel if needed
+app = st
+
 # Load environment variables
 load_dotenv()
 
