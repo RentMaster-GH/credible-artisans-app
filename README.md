@@ -34,3 +34,26 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Custom domain setup for Credible Artisans
+
+Use this format for domains:
+
+- `credibleartisans.com`
+- `www.credibleartisans.com`
+
+Deployment and DNS steps:
+
+1. Import `RentMaster-GH/credible-artisans-app` into Vercel and deploy.
+2. In Vercel project settings, add both custom domains:
+   - `credibleartisans.com`
+   - `www.credibleartisans.com`
+3. In your registrar DNS:
+   - Apex/root `credibleartisans.com` → `A` record `76.76.21.21`
+   - `www` → `CNAME` `cname.vercel-dns.com`
+4. Keep `credibleartisans.com` as canonical and redirect `www` to apex (configured in `vercel.json`).
+5. Verify:
+   - `https://credibleartisans.com` loads successfully
+   - `https://www.credibleartisans.com` permanently redirects to apex
+   - SSL certificates are issued for both domains in Vercel
+6. Remove old/conflicting DNS records after successful verification.
