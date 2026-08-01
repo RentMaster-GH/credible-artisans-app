@@ -1122,7 +1122,7 @@ def page_customer_support():
             st.error("❌ Invalid Developer PIN. Access Denied.")
 
 
-# Helper Component to Render the Developer Support Inbox
+# Helper Component to Render the Developer Support Inbox (UPDATED WITH UNIQUE TAB KEYS)
 def render_developer_support_inbox():
     st.markdown("### 📥 Customer Service Support Inbox")
     st.caption("Review complaints, user suggestions, and app feedback sent by users.")
@@ -1141,7 +1141,7 @@ def render_developer_support_inbox():
         "General Feedback"
     ])
 
-    def render_tickets_list(tickets):
+    def render_tickets_list(tickets, prefix="all"):
         if not tickets:
             st.info("No tickets under this category.")
             return
@@ -1161,7 +1161,7 @@ def render_developer_support_inbox():
                     st.markdown(f"Status: :{status_color}[**{status.upper()}**]")
 
                     if status != "Resolved":
-                        if st.button("✅ Mark Resolved", key=f"res_sup_{t.get('id')}", type="primary", use_container_width=True):
+                        if st.button("✅ Mark Resolved", key=f"res_sup_{prefix}_{t.get('id')}", type="primary", use_container_width=True):
                             t["status"] = "Resolved"
                             if sb:
                                 try:
@@ -1172,16 +1172,16 @@ def render_developer_support_inbox():
                             st.rerun()
 
     with tab_all:
-        render_tickets_list(inbox)
+        render_tickets_list(inbox, prefix="all")
 
     with tab_complaints:
-        render_tickets_list([t for t in inbox if "Complaint" in t.get("type", "") or "Fraud" in t.get("type", "")])
+        render_tickets_list([t for t in inbox if "Complaint" in t.get("type", "") or "Fraud" in t.get("type", "")], prefix="comp")
 
     with tab_suggestions:
-        render_tickets_list([t for t in inbox if "Suggestion" in t.get("type", "")])
+        render_tickets_list([t for t in inbox if "Suggestion" in t.get("type", "")], prefix="sug")
 
     with tab_feedback:
-        render_tickets_list([t for t in inbox if "Feedback" in t.get("type", "")])
+        render_tickets_list([t for t in inbox if "Feedback" in t.get("type", "")], prefix="feed")
 
 
 # ---------------------------------------------------------------------------
