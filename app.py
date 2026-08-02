@@ -72,6 +72,24 @@ DEVELOPER_PIN = get_secret("DEVELOPER_PIN", "admin123")  # Master PIN to unlock 
 
 @st.cache_resource
 def get_client():
+    """Shared read-only DB client (anon key only). Never mutate its auth headers."""
+    url = (SUPABASE_URL or "").strip()
+    key = (SUPABASE_KEY or "").strip()
+    if not url or not key:
+        return None
+    try:
+        return create_client(url, key)
+    except Exception:
+        return None
+
+
+def make_auth_client():
+    """Return a fresh, per-call Supabase client used exclusively for auth operations.
+
+    This ensures that sign-in / sign-out / sign-up calls never mutate the shared
+    ``sb`` singleton, preventing the global auth-state leak where one user's
+    credentials would bleed into every other concurrent browser session.
+    """
     url = (SUPABASE_URL or "").strip()
     key = (SUPABASE_KEY or "").strip()
     if not url or not key:
@@ -115,14 +133,42 @@ PRIMARY_CITIES = {
 }
 
 # ---------------------------------------------------------------------------
+# Session State Initialisation (isolated per browser session)
+# ---------------------------------------------------------------------------
+def init_session_state():
+    """Initialise every session-state key with dict-key notation.
+
+    Using explicit dictionary keys (st.session_state["key"]) instead of
+    attribute access (st.session_state.key) guarantees that each browser
+    session starts with its own private, isolated identity — Streamlit never
+    shares session_state between users.
+    """
+    defaults = {
+        "user": None,           # {email, id, access_token, is_logged_in} or None
+        "remember_me": True,    # persisted checkbox preference
+        "active_nav": "Find Artisans (Directory)",
+        "selected_artisan_id": None,
+        "ad_checkout_url": None,
+        "ad_checkout_ref": None,
+        "google_oauth_url": None,   # cached OAuth redirect URL (generated once)
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+init_session_state()
+
+
+# ---------------------------------------------------------------------------
 # In-Memory Session State Fallback (Guarantees execution even without DB)
 # ---------------------------------------------------------------------------
 def init_mock_data():
     if "user" not in st.session_state:
-        st.session_state.user = None
+        st.session_state["user"] = None
 
     if "mock_artisans" not in st.session_state:
-        st.session_state.mock_artisans = [
+        st.session_state["mock_artisans"] = [
             {
                 "id": "art-001",
                 "name": "Kwame Mensah",
@@ -167,7 +213,7 @@ def init_mock_data():
         ]
 
     if "mock_jobs" not in st.session_state:
-        st.session_state.mock_jobs = [
+        st.session_state["mock_jobs"] = [
             {
                 "id": "job-101",
                 "title": "Need Ceiling Fan & Chandelier Installed in East Legon",
@@ -184,14 +230,14 @@ def init_mock_data():
         ]
 
     if "mock_bids" not in st.session_state:
-        st.session_state.mock_bids = []
+        st.session_state["mock_bids"] = []
 
     if "mock_reviews" not in st.session_state:
-        st.session_state.mock_reviews = []
+        st.session_state["mock_reviews"] = []
 
     # RESTRICTED: CUSTOMER SERVICE & SUPPORT INBOX (Developer Access Only)
     if "mock_support_inbox" not in st.session_state:
-        st.session_state.mock_support_inbox = [
+        st.session_state["mock_support_inbox"] = [
             {
                 "id": "sup-001",
                 "type": "Complaint",
@@ -215,7 +261,7 @@ def init_mock_data():
         ]
 
     if "mock_ads" not in st.session_state:
-        st.session_state.mock_ads = [
+        st.session_state["mock_ads"] = [
             {
                 "id": "ad-001",
                 "business_name": "DeWalt Quality Tools Ghana",
@@ -244,7 +290,7 @@ def fetch_all_artisans():
                 return r.data
         except Exception:
             pass
-    return st.session_state.mock_artisans
+    return st.session_state["mock_artisans"]
 
 
 def fetch_all_jobs():
@@ -255,7 +301,7 @@ def fetch_all_jobs():
                 return r.data
         except Exception:
             pass
-    return st.session_state.mock_jobs
+    return st.session_state["mock_jobs"]
 
 
 def fetch_bids_for_job(job_id):
@@ -266,7 +312,7 @@ def fetch_bids_for_job(job_id):
                 return r.data
         except Exception:
             pass
-    return [b for b in st.session_state.mock_bids if b.get("job_id") == job_id]
+    return [b for b in st.session_state["mock_bids"] if b.get("job_id") == job_id]
 
 
 def fetch_reviews_for_artisan(artisan_id):
@@ -277,7 +323,7 @@ def fetch_reviews_for_artisan(artisan_id):
                 return r.data
         except Exception:
             pass
-    return [r for r in st.session_state.mock_reviews if r.get("artisan_id") == artisan_id]
+    return [r for r in st.session_state["mock_reviews"] if r.get("artisan_id") == artisan_id]
 
 
 def fetch_support_inbox():
@@ -289,7 +335,7 @@ def fetch_support_inbox():
                 return r.data
         except Exception:
             pass
-    return st.session_state.mock_support_inbox
+    return st.session_state["mock_support_inbox"]
 
 
 def fetch_all_ads():
@@ -300,7 +346,7 @@ def fetch_all_ads():
                 return r.data
         except Exception:
             pass
-    return st.session_state.mock_ads
+    return st.session_state["mock_ads"]
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +414,7 @@ def initialize_ad_payment(client_name: str, ad_position: str, amount_ghs: float,
         except Exception:
             pass
 
-    st.session_state.mock_ads.append(ad_payload)
+    st.session_state["mock_ads"].append(ad_payload)
 
     paystack_res = initialize_paystack_payment(
         email=email,
@@ -437,7 +483,7 @@ def handle_paystack_callbacks():
                         sb.table("ads").update({"status": "paid"}).eq("reference", reference).execute()
                     except Exception:
                         pass
-                for ad in st.session_state.mock_ads:
+                for ad in st.session_state["mock_ads"]:
                     if ad.get("reference") == reference:
                         ad["status"] = "paid"
                 st.success(f"✅ Payment for Sponsored Campaign (Ref: `{reference}`) verified! Your banner is active on CredibleArtisans.com.")
@@ -468,52 +514,70 @@ def auth_page():
             with tab1:
                 email = st.text_input("Email Address", key="auth_login_email", placeholder="you@example.com")
                 password = st.text_input("Password", type="password", key="auth_login_pw")
-                remember_me = st.checkbox("Remember Me", value=True, key="auth_remember_me")
+                remember_me = st.checkbox(
+                    "Remember Me",
+                    value=st.session_state["remember_me"],
+                    key="auth_remember_me"
+                )
 
                 if st.button("Log In", type="primary", use_container_width=True, key="auth_login_btn"):
                     if not email or not password:
                         st.error("Please enter both email and password.")
-                    elif sb:
-                        try:
-                            res = sb.auth.sign_in_with_password({"email": email, "password": password})
-                            if res.user:
-                                st.session_state.user = {
-                                    "email": res.user.email,
-                                    "id": res.user.id,
-                                    "is_logged_in": True
-                                }
-                                st.success("✅ Logged in successfully!")
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Login failed: {e}")
                     else:
-                        st.session_state.user = {
-                            "email": email,
-                            "id": "mock-user-123",
-                            "is_logged_in": True
-                        }
-                        st.success("✅ Logged in as Demo User!")
-                        st.rerun()
+                        # Persist the remember_me preference in isolated session state
+                        st.session_state["remember_me"] = remember_me
+                        auth_client = make_auth_client()
+                        if auth_client:
+                            try:
+                                res = auth_client.auth.sign_in_with_password({"email": email, "password": password})
+                                if res.user:
+                                    # Store identity strictly in session_state — never rely on
+                                    # the global sb client's auth state across browser sessions.
+                                    st.session_state["user"] = {
+                                        "email": res.user.email,
+                                        "id": res.user.id,
+                                        "access_token": res.session.access_token if res.session else None,
+                                        "is_logged_in": True,
+                                    }
+                                    st.success("✅ Logged in successfully!")
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"Login failed: {e}")
+                        else:
+                            st.session_state["user"] = {
+                                "email": email,
+                                "id": "mock-user-123",
+                                "access_token": None,
+                                "is_logged_in": True,
+                            }
+                            st.success("✅ Logged in as Demo User!")
+                            st.rerun()
 
                 st.divider()
 
-                if sb:
+                # Generate the Google OAuth URL once per session to avoid mutating
+                # the global sb auth state on every page render.
+                if st.session_state["google_oauth_url"] is None and sb:
                     try:
-                        res = sb.auth.sign_in_with_oauth({
-                            "provider": "google",
-                            "options": {"redirect_to": "https://www.credibleartisans.com"}
-                        })
-                        if res.url:
-                            st.markdown(
-                                f"""
-                                <a href="{res.url}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; background-color: white; color: #3c4043; font-weight: 500; text-decoration: none; font-size: 0.9rem;">
-                                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18"> Continue with Google
-                                </a>
-                                """,
-                                unsafe_allow_html=True
-                            )
+                        auth_client = make_auth_client()
+                        if auth_client:
+                            res = auth_client.auth.sign_in_with_oauth({
+                                "provider": "google",
+                                "options": {"redirect_to": "https://www.credibleartisans.com"}
+                            })
+                            st.session_state["google_oauth_url"] = res.url if res and res.url else ""
                     except Exception:
-                        pass
+                        st.session_state["google_oauth_url"] = ""
+
+                if st.session_state["google_oauth_url"]:
+                    st.markdown(
+                        f"""
+                        <a href="{st.session_state["google_oauth_url"]}" target="_self" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; background-color: white; color: #3c4043; font-weight: 500; text-decoration: none; font-size: 0.9rem;">
+                            <img src="https://www.gstatic.com/images/branding/product/1x/gsa_64dp.png" width="18" height="18"> Continue with Google
+                        </a>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
             with tab2:
                 new_email = st.text_input("Email Address", key="auth_signup_email")
@@ -529,14 +593,16 @@ def auth_page():
                         st.error("Passwords do not match.")
                     elif len(new_pw) < 6:
                         st.error("Password must be at least 6 characters.")
-                    elif sb:
-                        try:
-                            sb.auth.sign_up({"email": new_email, "password": new_pw})
-                            st.success("🎉 Account created! Check your email to confirm.")
-                        except Exception as e:
-                            st.error(f"Sign up error: {e}")
                     else:
-                        st.success("🎉 Account created! You can now log in.")
+                        auth_client = make_auth_client()
+                        if auth_client:
+                            try:
+                                auth_client.auth.sign_up({"email": new_email, "password": new_pw})
+                                st.success("🎉 Account created! Check your email to confirm.")
+                            except Exception as e:
+                                st.error(f"Sign up error: {e}")
+                        else:
+                            st.success("🎉 Account created! You can now log in.")
 
     # RIGHT COLUMN: SPONSORED CAMPAIGNS & ADVERT MANAGEMENT
     with ad_col:
@@ -566,9 +632,9 @@ def auth_page():
                 st.markdown("##### Launch a New Sponsored Campaign")
 
                 if "ad_checkout_url" not in st.session_state:
-                    st.session_state.ad_checkout_url = None
+                    st.session_state["ad_checkout_url"] = None
                 if "ad_checkout_ref" not in st.session_state:
-                    st.session_state.ad_checkout_ref = None
+                    st.session_state["ad_checkout_ref"] = None
 
                 with st.form("login_new_ad_form", clear_on_submit=False):
                     f1, f2 = st.columns(2)
@@ -606,7 +672,7 @@ def auth_page():
                         else:
                             with st.spinner("Initializing Paystack checkout..."):
                                 try:
-                                    user_id = st.session_state.user.get("id") if st.session_state.user else None
+                                    user_id = st.session_state["user"].get("id") if st.session_state["user"] else None
                                     ps_res, ref = initialize_ad_payment(
                                         client_name=client_name,
                                         ad_position=ad_position,
@@ -621,20 +687,20 @@ def auth_page():
                                     )
 
                                     if ps_res.get("status"):
-                                        st.session_state.ad_checkout_url = ps_res["data"]["authorization_url"]
-                                        st.session_state.ad_checkout_ref = ref
+                                        st.session_state["ad_checkout_url"] = ps_res["data"]["authorization_url"]
+                                        st.session_state["ad_checkout_ref"] = ref
                                         st.success("Campaign registered! Click the Pay button below to complete checkout.")
                                     else:
                                         st.error(f"Paystack Error: {ps_res.get('message')}")
                                 except Exception as e:
                                     st.error(f"Error processing checkout: {e}")
 
-                if st.session_state.ad_checkout_url:
+                if st.session_state["ad_checkout_url"]:
                     st.markdown("---")
-                    st.info(f"Reference Code: `{st.session_state.ad_checkout_ref}`")
+                    st.info(f"Reference Code: `{st.session_state['ad_checkout_ref']}`")
                     st.link_button(
                         "👉 Proceed to Pay via Paystack (Card / MoMo)",
-                        st.session_state.ad_checkout_url,
+                        st.session_state["ad_checkout_url"],
                         type="primary",
                         use_container_width=True
                     )
@@ -686,7 +752,7 @@ def page_directory():
     if not filtered:
         st.info("No artisans matching your search criteria yet. Post a job or select a different filter!")
         if st.button("➕ Post a Job Instead", type="primary"):
-            st.session_state.active_nav = "Post a Job"
+            st.session_state["active_nav"] = "Post a Job"
             st.rerun()
         return
 
@@ -728,8 +794,8 @@ def page_directory():
 
                         with btn_c3:
                             if st.button("📄 Full Profile", key=f"view_prof_{artisan['id']}", type="primary", use_container_width=True):
-                                st.session_state.selected_artisan_id = artisan["id"]
-                                st.session_state.active_nav = "Artisan Profile"
+                                st.session_state["selected_artisan_id"] = artisan["id"]
+                                st.session_state["active_nav"] = "Artisan Profile"
                                 st.rerun()
 
 
@@ -746,7 +812,7 @@ def page_artisan_profile():
     if not artisan:
         st.warning("No artisan selected. Return to directory to select one.")
         if st.button("⬅️ Back to Directory"):
-            st.session_state.active_nav = "Find Artisans (Directory)"
+            st.session_state["active_nav"] = "Find Artisans (Directory)"
             st.rerun()
         return
 
@@ -754,7 +820,7 @@ def page_artisan_profile():
     symbol = curr_info["symbol"]
 
     if st.button("⬅️ Back to Directory"):
-        st.session_state.active_nav = "Find Artisans (Directory)"
+        st.session_state["active_nav"] = "Find Artisans (Directory)"
         st.rerun()
 
     with st.container(border=True):
@@ -838,7 +904,7 @@ def page_artisan_profile():
                             sb.table("reviews").insert(new_rev).execute()
                         except Exception:
                             pass
-                    st.session_state.mock_reviews.append(new_rev)
+                    st.session_state["mock_reviews"].append(new_rev)
                     st.success("✅ Thank you! Your review has been submitted.")
                     st.rerun()
 
@@ -915,7 +981,7 @@ def page_marketplace():
                                             sb.table("bids").insert(new_bid).execute()
                                         except Exception:
                                             pass
-                                    st.session_state.mock_bids.append(new_bid)
+                                    st.session_state["mock_bids"].append(new_bid)
                                     st.success("✅ Bid placed successfully!")
                                     st.rerun()
 
@@ -963,7 +1029,7 @@ def page_marketplace():
                             sb.table("jobs").insert(new_job).execute()
                         except Exception:
                             pass
-                    st.session_state.mock_jobs.insert(0, new_job)
+                    st.session_state["mock_jobs"].insert(0, new_job)
                     st.success("🎉 Your job has been published! Artisans will begin bidding shortly.")
                     st.rerun()
 
@@ -1047,7 +1113,7 @@ def page_artisan_onboarding():
                     except Exception:
                         pass
 
-                st.session_state.mock_artisans.append(new_artisan)
+                st.session_state["mock_artisans"].append(new_artisan)
                 st.success("🎉 Registration submitted successfully to CredibleArtisans.com! Your profile is pending quick Admin ID verification.")
                 st.balloons()
 
@@ -1106,7 +1172,7 @@ def page_customer_support():
                         except Exception:
                             pass
 
-                    st.session_state.mock_support_inbox.insert(0, new_ticket)
+                    st.session_state["mock_support_inbox"].insert(0, new_ticket)
                     st.success("✅ Thank you! Your ticket has been sent directly to the developer team.")
 
     # RESTRICTED DEVELOPER INBOX (LOCKED BEHIND PIN)
@@ -1272,8 +1338,10 @@ def page_admin():
 # ---------------------------------------------------------------------------
 # Router & Main Execution Engine
 # ---------------------------------------------------------------------------
+# Session state is already initialised via init_session_state() near the top
+# of the file. The guard below is a safety net only.
 if "active_nav" not in st.session_state:
-    st.session_state.active_nav = "Find Artisans (Directory)"
+    st.session_state["active_nav"] = "Find Artisans (Directory)"
 
 NAVIGATION_MENU = {
     "Find Artisans (Directory)": page_directory,
@@ -1292,21 +1360,28 @@ with st.sidebar:
     selected_page = st.radio(
         "Navigate",
         list(NAVIGATION_MENU.keys()),
-        index=list(NAVIGATION_MENU.keys()).index(st.session_state.active_nav) if st.session_state.active_nav in NAVIGATION_MENU else 0
+        index=list(NAVIGATION_MENU.keys()).index(st.session_state["active_nav"]) if st.session_state["active_nav"] in NAVIGATION_MENU else 0
     )
-    st.session_state.active_nav = selected_page
+    st.session_state["active_nav"] = selected_page
 
     st.markdown("---")
 
-    if st.session_state.user and st.session_state.user.get("is_logged_in"):
-        st.write(f"👤 Logged in: **{st.session_state.user.get('email')}**")
+    if st.session_state["user"] and st.session_state["user"].get("is_logged_in"):
+        st.write(f"👤 Logged in: **{st.session_state['user'].get('email')}**")
         if st.button("Logout", key="sidebar_logout_btn", use_container_width=True):
-            if sb:
+            # Sign out using a fresh client so the shared sb singleton is untouched.
+            auth_client = make_auth_client()
+            if auth_client:
                 try:
-                    sb.auth.sign_out()
+                    access_token = st.session_state["user"].get("access_token")
+                    if access_token:
+                        auth_client.auth.set_session(access_token, "")
+                    auth_client.auth.sign_out()
                 except Exception:
                     pass
-            st.session_state.user = None
+            # Always clear the session-state identity regardless of network result.
+            st.session_state["user"] = None
+            st.session_state["google_oauth_url"] = None  # reset so fresh URL is fetched next login
             st.success("Logged out successfully.")
             st.rerun()
 
@@ -1315,11 +1390,11 @@ with st.sidebar:
     st.info("Are you a supplier or tool brand? Promote your products on CredibleArtisans.com!")
 
     if st.button("💳 Sponsor / Launch Campaign", use_container_width=True):
-        st.session_state.active_nav = "🔒 Login / Sponsored Ads"
+        st.session_state["active_nav"] = "🔒 Login / Sponsored Ads"
         st.rerun()
 
     st.markdown("---")
     st.caption("CredibleArtisans.com v3.0 • Powered by Streamlit & Supabase")
 
 # Execute Current Page Router
-NAVIGATION_MENU[st.session_state.active_nav]()
+NAVIGATION_MENU[st.session_state["active_nav"]]()
