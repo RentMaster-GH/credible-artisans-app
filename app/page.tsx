@@ -5,22 +5,28 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function Home() {
   const [status, setStatus] = useState('Checking Supabase connection...');
-  const supabase = createClient();
 
   useEffect(() => {
+    // 1. Instantiate the client inside useEffect to avoid re-creating it every render
+    const supabase = createClient();
+
     async function checkConnection() {
-      // Perform a light query to test connection
-      const { error } = await supabase.from('_not_a_real_table_').select('*');
-      
-      // A schema or relation error means the client successfully reached Supabase
-      if (error) {
-        setStatus('Connected to Supabase successfully!');
-      } else {
-        setStatus('Supabase connection active.');
+      try {
+        // 2. Use auth.getSession() to test live server connection reliably
+        const { error } = await supabase.auth.getSession();
+
+        if (error) {
+          setStatus(`Supabase connection error: ${error.message}`);
+        } else {
+          setStatus('Connected to Supabase successfully!');
+        }
+      } catch (err) {
+        setStatus('Failed to reach Supabase. Check your URL & Anon Key.');
       }
     }
+
     checkConnection();
-  }, [supabase]);
+  }, []); // 3. Empty dependency array prevents infinite re-render loops
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
