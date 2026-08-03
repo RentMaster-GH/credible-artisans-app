@@ -6,15 +6,14 @@ import Navbar from '@/components/Navbar'
 
 interface Ad {
   id: string
-  title: string
-  image_url: string
-  target_url: string
-  placement: string
-  is_active: boolean
+  business_name: string
+  creative_url: string
+  destination_url: string
+  ad_slot: string
+  status: string
   created_at: string
 }
 
-// Replace with your actual developer email address used in Supabase auth
 const DEVELOPER_EMAIL = 'your-email@example.com' 
 
 export default function AdminAdsPage() {
@@ -22,7 +21,7 @@ export default function AdminAdsPage() {
   const [loading, setLoading] = useState(true)
   const [authorized, setAuthorized] = useState(false)
   
-  // Form state for creating a new ad
+  // Form state
   const [title, setTitle] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [targetUrl, setTargetUrl] = useState('')
@@ -51,12 +50,12 @@ export default function AdminAdsPage() {
   const fetchAds = async () => {
     setLoading(true)
     const { data, error } = await supabase
-      .from('advertisements')
+      .from('ads')
       .select('*')
       .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setAds(data)
+      setAds(data as Ad[])
     }
     setLoading(false)
   }
@@ -65,12 +64,12 @@ export default function AdminAdsPage() {
     e.preventDefault()
     setSubmitting(true)
 
-    const { error } = await supabase.from('advertisements').insert({
-      title,
-      image_url: imageUrl,
-      target_url: targetUrl,
-      placement,
-      is_active: true,
+    const { error } = await supabase.from('ads').insert({
+      business_name: title,
+      creative_url: imageUrl,
+      destination_url: targetUrl,
+      ad_slot: placement,
+      status: 'active',
     })
 
     if (error) {
@@ -84,14 +83,15 @@ export default function AdminAdsPage() {
     setSubmitting(false)
   }
 
-  const toggleAdStatus = async (id: string, currentStatus: boolean) => {
+  const toggleAdStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'paused' : 'active'
     const { error } = await supabase
-      .from('advertisements')
-      .update({ is_active: !currentStatus })
+      .from('ads')
+      .update({ status: newStatus })
       .eq('id', id)
 
     if (!error) {
-      setAds(ads.map(ad => ad.id === id ? { ...ad, is_active: !currentStatus } : ad))
+      setAds(ads.map(ad => ad.id === id ? { ...ad, status: newStatus } : ad))
     }
   }
 
@@ -99,7 +99,7 @@ export default function AdminAdsPage() {
     if (!confirm('Are you sure you want to delete this ad?')) return
 
     const { error } = await supabase
-      .from('advertisements')
+      .from('ads')
       .delete()
       .eq('id', id)
 
@@ -214,37 +214,40 @@ export default function AdminAdsPage() {
             <div className="text-center py-12 text-gray-400 text-sm">No advertisements created yet.</div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {ads.map((ad) => (
-                <div key={ad.id} className="p-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 w-full sm:w-auto">
-                    <img src={ad.image_url} alt={ad.title} className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900">{ad.title}</h3>
-                      <p className="text-xs text-gray-400">Placement: <span className="uppercase">{ad.placement}</span></p>
-                      <a href={ad.target_url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline truncate max-w-xs block">
-                        {ad.target_url}
-                      </a>
+              {ads.map((ad) => {
+                const isActive = ad.status === 'active'
+                return (
+                  <div key={ad.id} className="p-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                      <img src={ad.creative_url} alt={ad.business_name} className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900">{ad.business_name}</h3>
+                        <p className="text-xs text-gray-400">Placement: <span className="uppercase">{ad.ad_slot}</span></p>
+                        <a href={ad.destination_url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 hover:underline truncate max-w-xs block">
+                          {ad.destination_url}
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                      <button
+                        onClick={() => toggleAdStatus(ad.id, ad.status)}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+                          isActive ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {isActive ? 'Active (Click to Pause)' : 'Paused (Click to Activate)'}
+                      </button>
+                      <button
+                        onClick={() => deleteAd(ad.id)}
+                        className="text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg transition"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    <button
-                      onClick={() => toggleAdStatus(ad.id, ad.is_active)}
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
-                        ad.is_active ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {ad.is_active ? 'Active (Click to Pause)' : 'Paused (Click to Activate)'}
-                    </button>
-                    <button
-                      onClick={() => deleteAd(ad.id)}
-                      className="text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg transition"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
