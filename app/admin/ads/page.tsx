@@ -136,12 +136,12 @@ export default function AdminAdsPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Developer Ad Manager</h1>
-          <p className="text-gray-500 text-sm mt-1">Upload, manage, and toggle paid advertisement banners across the platform.</p>
+          <p className="text-gray-500 text-sm mt-1">Upload, manage, and toggle paid ads banners across the platform.</p>
         </div>
 
         {/* Create Ad Form */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm mb-10">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Post a New Advertisement</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">Post a New Ads</h2>
           
           <form onSubmit={handleCreateAd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -198,7 +198,7 @@ export default function AdminAdsPage() {
                 disabled={submitting}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-6 py-2.5 rounded-xl shadow-sm transition"
               >
-                {submitting ? 'Publishing Ad...' : 'Publish Advertisement'}
+                {submitting ? 'Publishing Ad...' : 'Publish Ads'}
               </button>
             </div>
           </form>
@@ -207,11 +207,11 @@ export default function AdminAdsPage() {
         {/* Existing Ads Management Table */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-base font-bold text-gray-900">Active & Past Advertisements</h2>
+            <h2 className="text-base font-bold text-gray-900">Active & Past As</h2>
           </div>
 
           {ads.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 text-sm">No advertisements created yet.</div>
+            <div className="text-center py-12 text-gray-400 text-sm">No ads created yet.</div>
           ) : (
             <div className="divide-y divide-gray-100">
               {ads.map((ad) => {
