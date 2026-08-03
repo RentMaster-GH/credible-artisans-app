@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { handleGoogleSignIn } from '@/app/login/actions' // or inline helper
+// import { handleGoogleSignIn } from '@/app/login/actions'
 import PasswordInput from '@/components/PasswordInput'
 import Navbar from '@/components/Navbar'
 

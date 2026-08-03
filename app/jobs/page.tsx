@@ -61,7 +61,7 @@ export default function JobBoardPage() {
         // Safe handling without crashing Next.js dev overlay
         console.warn('Notice fetching jobs:', error.message)
       } else {
-        setJobs(data || [])
+        setJobs((data as unknown as Job[]) || [])
       }
       setLoading(false)
     }

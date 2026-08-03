@@ -75,7 +75,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       if (jobError) {
         console.error('Error fetching job:', jobError)
       } else {
-        setJob(jobData)
+        setJob(jobData as unknown as Job)
       }
 
       // 3. Fetch Bids for this Job
@@ -86,7 +86,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         .order('created_at', { ascending: false })
 
       if (!bidsError) {
-        setBids(bidsData || [])
+        setBids((bidsData as unknown as Bid[]) || [])
       }
 
       setLoading(false)
@@ -142,7 +142,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         .select('*')
         .eq('job_id', jobId)
         .order('created_at', { ascending: false })
-      if (refreshedBids) setBids(refreshedBids)
+      if (refreshedBids) setBids(refreshedBids as unknown as Bid[])
     }
 
     setSubmittingBid(false)

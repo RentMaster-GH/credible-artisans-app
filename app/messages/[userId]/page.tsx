@@ -9,7 +9,7 @@ interface Profile {
   id: string
   full_name: string
   avatar_url: string | null
-  location: string | null
+  location?: string | null  // 👈 Add '?' to make it optional
 }
 
 interface Message {
@@ -48,16 +48,16 @@ export default function ChatPage() {
       // Fetch distinct users who have interacted or all profiles to start chat with
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, location')
+        .select('id, full_name, avatar_url')
         .neq('id', user.id)
 
       if (!error && profiles) {
-        setConversations(profiles)
+        setConversations(profiles as unknown as Profile[])
 
         // If an activeReceiverId is provided in URL, set active chat partner
         if (activeReceiverId) {
           const partner = profiles.find((p) => p.id === activeReceiverId)
-          if (partner) setActivePartner(partner)
+          if (partner) setActivePartner(partner as unknown as Profile)
         }
       }
       setLoading(false)
@@ -80,7 +80,7 @@ export default function ChatPage() {
         .order('created_at', { ascending: true })
 
       if (!error && data) {
-        setMessages(data)
+        setMessages((data as unknown as Message[]) || [])
         scrollToBottom()
       }
     }
@@ -130,8 +130,8 @@ export default function ChatPage() {
 
     const { error } = await supabase.from('messages').insert({
       sender_id: currentUser.id,
-      receiver_id: activePartner.id,
-      message: text,
+      recipient_id: activePartner.id,
+      content: text,
     })
 
     if (error) {
