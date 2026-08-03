@@ -1,13 +1,18 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/database.types'
 
-// Export createClient function for components using createClient()
+let client: ReturnType<typeof createBrowserClient<Database>> | undefined
+
+// Return a single shared instance of the browser client
 export function createClient() {
-  return createBrowserClient<Database>(
+  if (client) return client
+
+  client = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
+
+  return client
 }
 
-// Export pre-initialized supabase instance for components using supabase.from(...)
 export const supabase = createClient()

@@ -17,9 +17,10 @@ export default function Navbar() {
   const supabase = createClient()
 
   useEffect(() => {
-    // 1. Fetch authenticated user directly on mount
-    const fetchUser = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
+    // 1. Immediate local session lookup
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const currentUser = session?.user ?? null
       setUser(currentUser)
 
       if (currentUser) {
@@ -30,9 +31,9 @@ export default function Navbar() {
       setLoading(false)
     }
 
-    fetchUser()
+    checkSession()
 
-    // 2. Listen to real-time auth state changes (login, logout, token refresh)
+    // 2. Real-time auth listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         const currentUser = session?.user ?? null
@@ -49,7 +50,7 @@ export default function Navbar() {
     return () => {
       subscription.unsubscribe()
     }
-  }, []) // Empty dependency array ensures single clean listener
+  }, [supabase])
 
   const handleSignOut = async () => {
     setLoading(true)
@@ -59,11 +60,9 @@ export default function Navbar() {
     setIsDropdownOpen(false)
     setIsMobileMenuOpen(false)
     setLoading(false)
-    router.push('/login')
-    router.refresh()
+    window.location.href = '/login'
   }
 
-  // User Display Info
   const displayName =
     user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Account'
   const userInitials = displayName.slice(0, 2).toUpperCase()
