@@ -38,7 +38,7 @@ export default function AdminAdsPage() {
       .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setAds(data as Ad[])
+      setAds(data as unknown as Ad[])
     }
     setLoading(false)
   }
@@ -65,7 +65,6 @@ export default function AdminAdsPage() {
     e.preventDefault()
     setSubmitting(true)
 
-    // Using (supabase.from('ads') as any) ensures 100% TypeScript compliance
     const { error } = await (supabase.from('ads') as any).insert({
       business_name: title,
       creative_url: imageUrl,

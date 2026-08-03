@@ -51,7 +51,7 @@ export default function ArtisanDirectoryPage() {
       if (error) {
         console.warn('Notice fetching artisans:', error.message)
       } else {
-        setArtisans(data || [])
+        setArtisans((data as unknown as Artisan[]) || [])
       }
       setLoading(false)
     }
