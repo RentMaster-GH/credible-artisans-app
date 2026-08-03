@@ -141,7 +141,7 @@ export default function AdminAdsPage() {
 
         {/* Create Ad Form */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm mb-10">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Post a New Ads</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">Post a New Ad</h2>
           
           <form onSubmit={handleCreateAd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -198,7 +198,7 @@ export default function AdminAdsPage() {
                 disabled={submitting}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-6 py-2.5 rounded-xl shadow-sm transition"
               >
-                {submitting ? 'Publishing Ad...' : 'Publish Ads'}
+                {submitting ? 'Publishing Ad...' : 'Publish Ad'}
               </button>
             </div>
           </form>
@@ -207,7 +207,7 @@ export default function AdminAdsPage() {
         {/* Existing Ads Management Table */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-base font-bold text-gray-900">Active & Past As</h2>
+            <h2 className="text-base font-bold text-gray-900">Active & Past Ads</h2>
           </div>
 
           {ads.length === 0 ? (
