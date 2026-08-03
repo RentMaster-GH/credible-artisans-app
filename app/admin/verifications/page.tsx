@@ -6,14 +6,14 @@ import Navbar from '@/components/Navbar'
 
 interface VerificationRequest {
   id: string
-  user_id: string
-  id_type: string
   id_document_url: string
-  status: string
+  id_type: string
+  status: string | null
   submitted_at: string
+  user_id: string | null
 }
 
-const DEVELOPER_EMAIL = 'papastickle@gmail.com' // Replace with your developer email
+const DEVELOPER_EMAIL = 'papastickle@gmail.com'
 
 export default function AdminVerificationsPage() {
   const [requests, setRequests] = useState<VerificationRequest[]>([])
@@ -47,12 +47,17 @@ export default function AdminVerificationsPage() {
       .order('submitted_at', { ascending: false })
 
     if (!error && data) {
-      setRequests(data)
+      setRequests(data as VerificationRequest[])
     }
     setLoading(false)
   }
 
-  const approveUserVerification = async (userId: string, verificationId: string) => {
+  const approveUserVerification = async (userId: string | null, verificationId: string) => {
+    if (!userId) {
+      alert('Error: User ID is missing')
+      return
+    }
+
     // 1. Mark verification request as verified
     await supabase
       .from('verifications')

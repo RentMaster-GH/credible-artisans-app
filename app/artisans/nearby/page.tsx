@@ -8,11 +8,11 @@ import Navbar from '@/components/Navbar'
 interface ArtisanProfile {
   id: string
   full_name: string
-  skills: string[] | string | null
-  location: string | null
-  hourly_rate: number | null
-  latitude: number | null
-  longitude: number | null
+  skills?: string[] | string | null
+  location?: string | null
+  hourly_rate?: number | null
+  latitude?: number | null
+  longitude?: number | null
   distance?: number
 }
 
@@ -90,7 +90,7 @@ export default function NearbyArtisansPage() {
     const { data, error } = await supabase.from('profiles').select('*')
 
     if (!error && data) {
-      const processed = data.map((artisan: ArtisanProfile) => {
+      const processed: ArtisanProfile[] = (data as any[]).map((artisan) => {
         let distance = 0
         if (artisan.latitude && artisan.longitude) {
           distance = calculateDistance(refLat, refLng, artisan.latitude, artisan.longitude)
@@ -98,7 +98,16 @@ export default function NearbyArtisansPage() {
           // Mock arbitrary distance if coordinates aren't set yet
           distance = Math.floor(Math.random() * 15) + 1
         }
-        return { ...artisan, distance }
+        return {
+          id: artisan.id,
+          full_name: artisan.full_name,
+          skills: artisan.skills || null,
+          location: artisan.location || null,
+          hourly_rate: artisan.hourly_rate || null,
+          latitude: artisan.latitude,
+          longitude: artisan.longitude,
+          distance,
+        }
       })
 
       // Sort by closest proximity

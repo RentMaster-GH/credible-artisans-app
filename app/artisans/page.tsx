@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import AdBanner from '@/components/AdBanner'
 
 interface Artisan {
   id: string
@@ -38,7 +37,6 @@ export default function ArtisanDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    // 1. Instantiate the Supabase client inside useEffect to prevent infinite loops
     const supabase = createClient()
 
     const fetchArtisans = async () => {
@@ -59,7 +57,7 @@ export default function ArtisanDirectoryPage() {
     }
 
     fetchArtisans()
-  }, []) // 2. Empty dependency array prevents re-render loops
+  }, [])
 
   const filteredArtisans = artisans.filter((artisan) => {
     const matchesSearch =
@@ -177,11 +175,20 @@ export default function ArtisanDirectoryPage() {
             )}
           </div>
 
-          {/* Right Sidebar Column (Takes 1 column for Ads) */}
+          {/* Right Sidebar Column */}
           <div className="lg:col-span-1">
-            <div className="sticky top-6">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Sponsored</h3>
-              <AdBanner placement="sidebar" />
+            <div className="sticky top-6 bg-emerald-900 text-white rounded-2xl p-6 shadow-sm">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Sponsored</span>
+              <h4 className="text-lg font-bold mt-2">Are you a Skilled Artisan?</h4>
+              <p className="text-xs text-emerald-100 mt-2">
+                Join Credible Artisans today and get connected with clients in your area.
+              </p>
+              <Link
+                href="/register"
+                className="inline-block mt-4 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2.5 rounded-xl transition"
+              >
+                Register as Artisan
+              </Link>
             </div>
           </div>
 

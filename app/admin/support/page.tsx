@@ -48,7 +48,7 @@ export default function AdminSupportPage() {
       .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setTickets(data)
+      setTickets(data as Ticket[])
     }
     setLoading(false)
   }

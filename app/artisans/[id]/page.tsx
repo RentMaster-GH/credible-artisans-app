@@ -8,19 +8,21 @@ import Navbar from '@/components/Navbar'
 interface ArtisanDetail {
   id: string
   business_name: string | null
-  primary_skill: string
   bio: string | null
-  experience_years: number
+  experience_years: number | null
   hourly_rate: number | null
-  location: string
-  verified: boolean
-  rating: number
-  jobs_completed: number
-  profiles: {
-    full_name: string
+  jobs_completed: number | null
+  rating?: number | null
+  primary_skill?: string | null
+  location?: string | null
+  verified?: boolean | null
+  created_at?: string | null
+  profiles?: {
+    full_name: string | null
     avatar_url: string | null
-    phone_number: string | null
-  }
+    phone_number?: string | null
+    email?: string | null
+  } | null
 }
 
 export default function ArtisanDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,7 +53,7 @@ export default function ArtisanDetailPage({ params }: { params: Promise<{ id: st
       if (error) {
         console.error('Error fetching artisan profile:', error)
       } else {
-        setArtisan(data)
+        setArtisan(data as unknown as ArtisanDetail)
       }
       setLoading(false)
     }
@@ -100,7 +102,7 @@ export default function ArtisanDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-5">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-700 text-3xl overflow-hidden border-2 border-indigo-200 flex-shrink-0">
                 {artisan.profiles?.avatar_url ? (
-                  <img src={artisan.profiles.avatar_url} alt={artisan.profiles?.full_name} className="w-full h-full object-cover" />
+                  <img src={artisan.profiles.avatar_url} alt={artisan.profiles?.full_name || 'Artisan'} className="w-full h-full object-cover" />
                 ) : (
                   artisan.profiles?.full_name?.charAt(0) || 'A'
                 )}
@@ -117,7 +119,7 @@ export default function ArtisanDetailPage({ params }: { params: Promise<{ id: st
                 {artisan.business_name && (
                   <p className="text-sm text-gray-600 font-medium mt-0.5">{artisan.business_name}</p>
                 )}
-                <p className="text-xs text-gray-400 mt-1">📍 {artisan.location}</p>
+                <p className="text-xs text-gray-400 mt-1">📍 {artisan.location || 'Location Not Specified'}</p>
               </div>
             </div>
 
@@ -133,16 +135,16 @@ export default function ArtisanDetailPage({ params }: { params: Promise<{ id: st
           <div className="grid grid-cols-3 gap-4 py-6 border-b border-gray-100 text-center">
             <div>
               <p className="text-xs text-gray-400 uppercase font-medium">Primary Skill</p>
-              <p className="text-sm font-bold text-gray-900 mt-1">{artisan.primary_skill}</p>
+              <p className="text-sm font-bold text-gray-900 mt-1">{artisan.primary_skill || 'General Artisan'}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 uppercase font-medium">Experience</p>
-              <p className="text-sm font-bold text-gray-900 mt-1">{artisan.experience_years} Years</p>
+              <p className="text-sm font-bold text-gray-900 mt-1">{artisan.experience_years ?? 0} Years</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 uppercase font-medium">Rating & Jobs</p>
               <p className="text-sm font-bold text-amber-600 mt-1">
-                ★ {artisan.rating ? artisan.rating.toFixed(1) : 'New'} ({artisan.jobs_completed} completed)
+                ★ {artisan.rating ? artisan.rating.toFixed(1) : 'New'} ({artisan.jobs_completed ?? 0} completed)
               </p>
             </div>
           </div>
