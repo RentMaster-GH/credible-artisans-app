@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import AdBanner from '@/components/AdBanner'
 
 interface Artisan {
   id: string
@@ -36,9 +37,10 @@ export default function ArtisanDirectoryPage() {
   const [selectedSkill, setSelectedSkill] = useState('All Skills')
   const [searchTerm, setSearchTerm] = useState('')
 
-  const supabase = createClient()
-
   useEffect(() => {
+    // 1. Instantiate the Supabase client inside useEffect to prevent infinite loops
+    const supabase = createClient()
+
     const fetchArtisans = async () => {
       setLoading(true)
       let query = supabase
@@ -49,7 +51,6 @@ export default function ArtisanDirectoryPage() {
       const { data, error } = await query
 
       if (error) {
-        // Safe handling without crashing Next.js dev overlay
         console.warn('Notice fetching artisans:', error.message)
       } else {
         setArtisans(data || [])
@@ -58,7 +59,7 @@ export default function ArtisanDirectoryPage() {
     }
 
     fetchArtisans()
-  }, [supabase])
+  }, []) // 2. Empty dependency array prevents re-render loops
 
   const filteredArtisans = artisans.filter((artisan) => {
     const matchesSearch =
@@ -124,7 +125,7 @@ export default function ArtisanDirectoryPage() {
         {/* Main Content Layout with Sidebar Ad */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* Left/Main Artisan Grid (Takes 3 columns on large screens) */}
+          {/* Left/Main Artisan Grid */}
           <div className="lg:col-span-3">
             {loading ? (
               <div className="text-center py-20 text-gray-500 text-sm">Loading available artisans...</div>
