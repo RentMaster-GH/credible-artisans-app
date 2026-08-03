@@ -5,17 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import PasswordInput from '@/components/PasswordInput'
-
-export async function handleGoogleSignIn() {
-  const supabase = createClient()
-  await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    },
-  })
-}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -26,97 +15,92 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
 
     if (error) {
-      setErrorMsg(error.message || 'Failed to sign in. Check your email and password.')
+      setErrorMsg(error.message || 'Invalid email or password.')
       setLoading(false)
-    } else {
+      return
+    }
+
+    if (data.user) {
       router.push('/dashboard')
       router.refresh()
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-between">
+    <div className="min-h-screen bg-gray-50 pb-16">
       <Navbar />
 
-      <div className="max-w-md w-full mx-auto px-4 py-12">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          
-          <div className="text-center mb-8">
+      <div className="max-w-md mx-auto pt-16 px-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="text-center mb-6">
             <h1 className="text-2xl font-extrabold text-gray-900">Welcome Back</h1>
-            <p className="text-gray-500 text-sm mt-1">Sign in to your global marketplace account</p>
+            <p className="text-gray-500 text-xs mt-1">Sign in to your Credible Artisans account</p>
           </div>
 
           {errorMsg && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
               {errorMsg}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm outline-none transition"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
             <div>
-              {/* Using the PasswordInput component with the eye reveal icon */}
-              <PasswordInput 
-                id="password" 
-                name="password" 
-                label="Password" 
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-medium text-gray-700">Password</label>
+                <Link href="/forgot-password" className="text-xs text-indigo-600 hover:underline font-semibold">
+                  Forgot password?
+                </Link>
+              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm shadow-sm transition disabled:opacity-50"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">Or continue with</span></div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition shadow-sm"
-          >
-            <span>🌐</span> Sign in with Google
-          </button>
-
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Don't have an account?{' '}
-            <Link href="/signup" className="text-emerald-600 font-semibold hover:underline">
-              Create an account
+          <div className="mt-6 text-center text-xs text-gray-500">
+            Don't have an account yet?{' '}
+            <Link href="/login?signup=true" className="text-indigo-600 font-bold hover:underline">
+              Create an Account
             </Link>
-          </p>
-
+          </div>
         </div>
       </div>
-      <div />
     </div>
   )
 }

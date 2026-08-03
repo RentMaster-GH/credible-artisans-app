@@ -104,8 +104,17 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right Section: Auth State & Actions */}
+          {/* Right Section: Donate Badge, Auth State & Actions */}
           <div className="hidden md:flex items-center space-x-4">
+            
+            {/* ❤️ Donate Button (Desktop) */}
+            <Link
+              href="/donate"
+              className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition flex items-center gap-1.5"
+            >
+              ❤️ Donate
+            </Link>
+
             {!loading && (
               <>
                 {user ? (
@@ -257,6 +266,15 @@ export default function Navbar() {
             className="block text-base font-medium text-gray-700 hover:text-indigo-600"
           >
             Post a Job
+          </Link>
+
+          {/* ❤️ Donate Link (Mobile) */}
+          <Link
+            href="/donate"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block text-base font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            ❤️ Donate
           </Link>
 
           <div className="border-t border-gray-100 pt-3">
