@@ -1,0 +1,51 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+// Initialize Supabase admin client for backend webhook processing
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+
+    // Paystack / Flutterwave event verification check
+    // Adjust event structure depending on your chosen payment gateway provider
+    const event = body.event || body.type
+
+    if (event === 'charge.success' || event === 'successful') {
+      const paymentData = body.data || body
+      const amountPaid = paymentData.amount / 100 // Convert pesewas/cents to GHS/USD
+      const metadata = paymentData.metadata || {}
+      
+      const jobId = metadata.job_id
+      const artisanId = metadata.artisan_id
+
+      // Calculate 5% platform commission
+      const commissionRate = 0.05 
+      const commissionEarned = amountPaid * commissionRate
+
+      // Log the commission into your commissions table
+      const { error } = await supabaseAdmin.from('commissions').insert({
+        job_id: jobId || null,
+        artisan_id: artisanId || null,
+        amount_charged: amountPaid,
+        commission_rate: commissionRate,
+        commission_earned: commissionEarned,
+        status: 'paid',
+      })
+
+      if (error) {
+        console.error('Error logging commission:', error.message)
+        return NextResponse.json({ error: 'Database insert failed' }, { status: 500 })
+      }
+    }
+
+    return NextResponse.json({ received: true }, { status: 200 })
+  } catch (err: any) {
+    console.error('Webhook error:', err.message)
+    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 400 })
+  }
+}
