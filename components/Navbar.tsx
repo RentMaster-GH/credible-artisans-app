@@ -17,20 +17,22 @@ export default function Navbar() {
   const supabase = createClient()
 
   useEffect(() => {
-    const getUserSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      const currentUser = session?.user ?? null
+    // 1. Fetch authenticated user directly on mount
+    const fetchUser = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
       setUser(currentUser)
 
       if (currentUser) {
-        const role = currentUser.user_metadata?.role || 'client'
-        setUserRole(role)
+        setUserRole(currentUser.user_metadata?.role || 'client')
+      } else {
+        setUserRole(null)
       }
       setLoading(false)
     }
 
-    getUserSession()
+    fetchUser()
 
+    // 2. Listen to real-time auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         const currentUser = session?.user ?? null
@@ -47,16 +49,21 @@ export default function Navbar() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase])
+  }, []) // Empty dependency array ensures single clean listener
 
   const handleSignOut = async () => {
+    setLoading(true)
     await supabase.auth.signOut()
+    setUser(null)
+    setUserRole(null)
     setIsDropdownOpen(false)
     setIsMobileMenuOpen(false)
+    setLoading(false)
     router.push('/login')
     router.refresh()
   }
 
+  // User Display Info
   const displayName =
     user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Account'
   const userInitials = displayName.slice(0, 2).toUpperCase()
@@ -106,6 +113,7 @@ export default function Navbar() {
             {!loading && (
               <>
                 {user ? (
+                  /* USER IS LOGGED IN -> SHOW AVATAR & DROPDOWN WITH SIGN OUT */
                   <div className="relative">
                     <button
                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -124,7 +132,7 @@ export default function Navbar() {
                       </div>
                     </button>
 
-                    {/* Dropdown Menu */}
+                    {/* User Dropdown Menu */}
                     {isDropdownOpen && (
                       <div
                         className="origin-top-right absolute right-0 mt-2 w-52 rounded-xl shadow-lg bg-white border border-gray-100 py-1 z-50"
@@ -147,7 +155,6 @@ export default function Navbar() {
                           📊 Dashboard
                         </Link>
 
-                        {/* ⚙️ SETTINGS LINK */}
                         <Link
                           href="/settings"
                           onClick={() => setIsDropdownOpen(false)}
@@ -159,7 +166,7 @@ export default function Navbar() {
                         <div className="border-t border-gray-100">
                           <button
                             onClick={handleSignOut}
-                            className="w-full text-left block px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
+                            className="w-full text-left block px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition"
                           >
                             🚪 Sign Out
                           </button>
@@ -168,6 +175,7 @@ export default function Navbar() {
                     )}
                   </div>
                 ) : (
+                  /* USER IS NOT LOGGED IN -> SHOW SIGN IN / GET STARTED */
                   <div className="flex items-center space-x-3">
                     <Link
                       href="/login"
