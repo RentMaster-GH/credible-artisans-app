@@ -32,13 +32,13 @@ interface Bid {
 }
 
 interface ArtisanProfile {
-  business_name: string | null
-  primary_skill: string
-  rating: number
-  jobs_completed: number
-  hourly_rate: number | null
-  experience_years: number
-  verified: boolean
+  business_name?: string | null
+  primary_skill?: string | null
+  rating?: number | null
+  jobs_completed?: number | null
+  hourly_rate?: number | null
+  experience_years?: number | null
+  verified?: boolean | null
 }
 
 export default function DashboardPage() {
@@ -95,7 +95,7 @@ export default function DashboardPage() {
           .single()
 
         if (artProfile) {
-          setArtisanProfile(artProfile)
+          setArtisanProfile(artProfile as unknown as ArtisanProfile)
         }
 
         const { data: myBids, error: bidsError } = await supabase
@@ -108,7 +108,7 @@ export default function DashboardPage() {
           .order('created_at', { ascending: false })
 
         if (!bidsError && myBids) {
-          setArtisanBids(myBids)
+          setArtisanBids(myBids as unknown as Bid[])
         }
       } 
       // 4. If Client, fetch posted jobs and incoming proposals
@@ -120,7 +120,7 @@ export default function DashboardPage() {
           .order('created_at', { ascending: false })
 
         if (!jobsError && userJobs) {
-          setClientJobs(userJobs)
+          setClientJobs(userJobs as unknown as Job[])
 
           if (userJobs.length > 0) {
             const jobIds = userJobs.map((j) => j.id)
@@ -212,7 +212,7 @@ export default function DashboardPage() {
       .eq('client_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (refreshedJobs) setClientJobs(refreshedJobs)
+    if (refreshedJobs) setClientJobs(refreshedJobs as unknown as Job[])
     setActionLoading(null)
   }
 
