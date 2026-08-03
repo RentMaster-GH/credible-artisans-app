@@ -6,15 +6,14 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import PasswordInput from '@/components/PasswordInput'
 import Navbar from '@/components/Navbar'
-
-const LOCATIONS = ['Accra', 'Kumasi', 'Cape Coast', 'Takoradi', 'Tamale', 'Koforidua', 'Sunyani', 'Other']
+import { WORLD_COUNTRIES } from '@/lib/countries'
 
 export default function ComprehensiveSignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
-  const [location, setLocation] = useState('Accra')
+  const [location, setLocation] = useState('Ghana')
   const [role, setRole] = useState<'client' | 'artisan'>('client')
 
   const [loading, setLoading] = useState(false)
@@ -28,7 +27,6 @@ export default function ComprehensiveSignupPage() {
     setLoading(true)
     setErrorMsg(null)
 
-    // 1. Register with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password: password,
@@ -37,6 +35,7 @@ export default function ComprehensiveSignupPage() {
           full_name: fullName,
           role: role,
           phone_number: phoneNumber,
+          location: location,
         },
       },
     })
@@ -47,7 +46,6 @@ export default function ComprehensiveSignupPage() {
       return
     }
 
-    // 2. Create/update profile row
     if (authData.user) {
       await supabase.from('profiles').upsert({
         id: authData.user.id,
@@ -83,7 +81,6 @@ export default function ComprehensiveSignupPage() {
           )}
 
           <form onSubmit={handleSignUp} className="space-y-5">
-            {/* Account Role Selector */}
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                 I am joining as a:
@@ -115,7 +112,6 @@ export default function ComprehensiveSignupPage() {
               </div>
             </div>
 
-            {/* Full Name */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
               <input
@@ -128,7 +124,6 @@ export default function ComprehensiveSignupPage() {
               />
             </div>
 
-            {/* Email & Phone Number Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
@@ -155,23 +150,22 @@ export default function ComprehensiveSignupPage() {
               </div>
             </div>
 
-            {/* Location Selector */}
+            {/* Country Selector with All World Countries */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Primary Location / City</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Country / Primary Location</label>
               <select
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-indigo-500"
               >
-                {LOCATIONS.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {loc}, Ghana
+                {WORLD_COUNTRIES.map((country) => (
+                  <option key={country} value={country}>
+                    {country}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Password with Eye Toggle */}
             <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}

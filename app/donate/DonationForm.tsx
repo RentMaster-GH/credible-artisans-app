@@ -186,8 +186,8 @@ export default function DonationForm() {
           💳 Donate GHS {numericAmount || 0} via Paystack
         </button>
 
-        <p className="text-center text-xs text-gray-400">
-          🔒 Secured by Paystack. Accepts Mobile Money (MTN, Telecel, AT), Cards, and Bank Transfer.
+        <p className="text-center text-xs text-gray-500">
+          🔒 Secured by Paystack. Supports Bank Cards (Visa & Mastercard), Bank Transfer, and Mobile Money.
         </p>
 
       </form>
