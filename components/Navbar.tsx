@@ -17,14 +17,12 @@ export default function Navbar() {
   const supabase = createClient()
 
   useEffect(() => {
-    // 1. Check initial user session
     const getUserSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       const currentUser = session?.user ?? null
       setUser(currentUser)
 
       if (currentUser) {
-        // Fetch role metadata from profile or auth metadata
         const role = currentUser.user_metadata?.role || 'client'
         setUserRole(role)
       }
@@ -33,7 +31,6 @@ export default function Navbar() {
 
     getUserSession()
 
-    // 2. Listen to real-time auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         const currentUser = session?.user ?? null
@@ -60,7 +57,6 @@ export default function Navbar() {
     router.refresh()
   }
 
-  // Get user display name or fallback to email prefix
   const displayName =
     user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Account'
   const userInitials = displayName.slice(0, 2).toUpperCase()
@@ -81,33 +77,34 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
-              <Link
-                href="/artisans"
-                className="text-gray-600 hover:text-indigo-600 transition"
-              >
-                Find Artisans
-              </Link>
-              <Link
-                href="/jobs"
-                className="text-gray-600 hover:text-indigo-600 transition"
-              >
-                Job Board
-              </Link>
-              <Link
-                href="/jobs/new"
-                className="text-gray-600 hover:text-indigo-600 transition"
-              >
-                Post a Job
-              </Link>
-            </div>
+            {/* Desktop Navigation Links — ONLY VISIBLE TO REGISTERED LOGGED-IN USERS */}
+            {user && (
+              <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
+                <Link
+                  href="/artisans"
+                  className="text-gray-600 hover:text-indigo-600 transition"
+                >
+                  Find Artisans
+                </Link>
+                <Link
+                  href="/jobs"
+                  className="text-gray-600 hover:text-indigo-600 transition"
+                >
+                  Job Board
+                </Link>
+                <Link
+                  href="/jobs/new"
+                  className="text-gray-600 hover:text-indigo-600 transition"
+                >
+                  Post a Job
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Right Section: Donate Badge, Auth State & Actions */}
           <div className="hidden md:flex items-center space-x-4">
             
-            {/* ❤️ Donate Button (Desktop) */}
             <Link
               href="/donate"
               className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition flex items-center gap-1.5"
@@ -134,19 +131,6 @@ export default function Navbar() {
                           {userRole || 'User'}
                         </p>
                       </div>
-                      <svg
-                        className="w-4 h-4 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
                     </button>
 
                     {/* User Dropdown Menu */}
@@ -171,20 +155,21 @@ export default function Navbar() {
                         >
                           Dashboard
                         </Link>
+
                         <Link
-                          href="/profile"
+                          href="/settings"
                           onClick={() => setIsDropdownOpen(false)}
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
                         >
-                          Edit Profile
+                          Settings & Mode Switch
                         </Link>
 
                         <div className="border-t border-gray-100">
                           <button
                             onClick={handleSignOut}
-                            className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                            className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition font-medium"
                           >
-                            Sign Out
+                            🚪 Sign Out
                           </button>
                         </div>
                       </div>
@@ -199,7 +184,7 @@ export default function Navbar() {
                       Sign In
                     </Link>
                     <Link
-                      href="/login?signup=true"
+                      href="/signup"
                       className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition"
                     >
                       Get Started
@@ -216,26 +201,11 @@ export default function Navbar() {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none"
             >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMobileMenuOpen ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 )}
               </svg>
             </button>
@@ -246,29 +216,33 @@ export default function Navbar() {
       {/* Mobile Menu Drawer */}
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-gray-200 bg-white px-4 pt-3 pb-6 space-y-3">
-          <Link
-            href="/artisans"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="block text-base font-medium text-gray-700 hover:text-indigo-600"
-          >
-            Find Artisans
-          </Link>
-          <Link
-            href="/jobs"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="block text-base font-medium text-gray-700 hover:text-indigo-600"
-          >
-            Job Board
-          </Link>
-          <Link
-            href="/jobs/new"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="block text-base font-medium text-gray-700 hover:text-indigo-600"
-          >
-            Post a Job
-          </Link>
+          
+          {user && (
+            <>
+              <Link
+                href="/artisans"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block text-base font-medium text-gray-700 hover:text-indigo-600"
+              >
+                Find Artisans
+              </Link>
+              <Link
+                href="/jobs"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block text-base font-medium text-gray-700 hover:text-indigo-600"
+              >
+                Job Board
+              </Link>
+              <Link
+                href="/jobs/new"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block text-base font-medium text-gray-700 hover:text-indigo-600"
+              >
+                Post a Job
+              </Link>
+            </>
+          )}
 
-          {/* ❤️ Donate Link (Mobile) */}
           <Link
             href="/donate"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -296,11 +270,18 @@ export default function Navbar() {
                 >
                   Dashboard
                 </Link>
+                <Link
+                  href="/settings"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block text-sm font-medium text-gray-700 hover:text-indigo-600"
+                >
+                  Settings & Mode Switch
+                </Link>
                 <button
                   onClick={handleSignOut}
-                  className="block w-full text-left text-sm font-medium text-red-600"
+                  className="block w-full text-left text-sm font-bold text-red-600 pt-2"
                 >
-                  Sign Out
+                  🚪 Sign Out
                 </button>
               </div>
             ) : (
@@ -313,7 +294,7 @@ export default function Navbar() {
                   Sign In
                 </Link>
                 <Link
-                  href="/login?signup=true"
+                  href="/signup"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full text-center py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg"
                 >
