@@ -66,7 +66,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           
-          {/* Brand Logo & Main Navigation Links */}
+          {/* Brand Logo & Navigation Links */}
           <div className="flex items-center space-x-8">
             <Link href="/" className="flex items-center space-x-2">
               <span className="bg-indigo-600 text-white font-black text-xl px-2.5 py-1 rounded-lg shadow-sm">
@@ -77,32 +77,23 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* Desktop Navigation Links — ONLY VISIBLE TO REGISTERED LOGGED-IN USERS */}
+            {/* Links visible ONLY to logged-in registered users */}
             {user && (
               <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <Link
-                  href="/artisans"
-                  className="text-gray-600 hover:text-indigo-600 transition"
-                >
+                <Link href="/artisans" className="text-gray-600 hover:text-indigo-600 transition">
                   Find Artisans
                 </Link>
-                <Link
-                  href="/jobs"
-                  className="text-gray-600 hover:text-indigo-600 transition"
-                >
+                <Link href="/jobs" className="text-gray-600 hover:text-indigo-600 transition">
                   Job Board
                 </Link>
-                <Link
-                  href="/jobs/new"
-                  className="text-gray-600 hover:text-indigo-600 transition"
-                >
+                <Link href="/jobs/new" className="text-gray-600 hover:text-indigo-600 transition">
                   Post a Job
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Right Section: Donate Badge, Auth State & Actions */}
+          {/* Right Section: Donate & User Menu */}
           <div className="hidden md:flex items-center space-x-4">
             
             <Link
@@ -118,29 +109,29 @@ export default function Navbar() {
                   <div className="relative">
                     <button
                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className="flex items-center space-x-3 focus:outline-none p-1 rounded-full hover:bg-gray-50 transition"
+                      className="flex items-center space-x-3 focus:outline-none p-1 rounded-full hover:bg-gray-50 transition border border-gray-200 pr-3"
                     >
-                      <div className="w-9 h-9 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                      <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
                         {userInitials}
                       </div>
                       <div className="text-left hidden lg:block">
-                        <p className="text-sm font-semibold text-gray-900 leading-none">
+                        <p className="text-xs font-semibold text-gray-900 leading-none">
                           {displayName}
                         </p>
-                        <p className="text-xs text-gray-500 capitalize mt-0.5">
+                        <p className="text-[10px] text-gray-500 capitalize mt-0.5">
                           {userRole || 'User'}
                         </p>
                       </div>
                     </button>
 
-                    {/* User Dropdown Menu */}
+                    {/* Dropdown Menu */}
                     {isDropdownOpen && (
                       <div
                         className="origin-top-right absolute right-0 mt-2 w-52 rounded-xl shadow-lg bg-white border border-gray-100 py-1 z-50"
                         onMouseLeave={() => setIsDropdownOpen(false)}
                       >
                         <div className="px-4 py-2 border-b border-gray-100">
-                          <p className="text-xs font-semibold text-gray-400 uppercase">
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase">
                             Signed in as
                           </p>
                           <p className="text-xs font-medium text-gray-800 truncate mt-0.5">
@@ -151,23 +142,24 @@ export default function Navbar() {
                         <Link
                           href="/dashboard"
                           onClick={() => setIsDropdownOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                          className="block px-4 py-2 text-xs font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
                         >
-                          Dashboard
+                          📊 Dashboard
                         </Link>
 
+                        {/* ⚙️ SETTINGS LINK */}
                         <Link
                           href="/settings"
                           onClick={() => setIsDropdownOpen(false)}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                          className="block px-4 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition"
                         >
-                          Settings & Mode Switch
+                          ⚙️ Account Settings
                         </Link>
 
                         <div className="border-t border-gray-100">
                           <button
                             onClick={handleSignOut}
-                            className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition font-medium"
+                            className="w-full text-left block px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
                           >
                             🚪 Sign Out
                           </button>
@@ -213,91 +205,47 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu Drawer */}
+      {/* Mobile Drawer */}
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-gray-200 bg-white px-4 pt-3 pb-6 space-y-3">
-          
           {user && (
             <>
-              <Link
-                href="/artisans"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block text-base font-medium text-gray-700 hover:text-indigo-600"
-              >
+              <Link href="/artisans" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-medium text-gray-700">
                 Find Artisans
               </Link>
-              <Link
-                href="/jobs"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block text-base font-medium text-gray-700 hover:text-indigo-600"
-              >
+              <Link href="/jobs" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-medium text-gray-700">
                 Job Board
               </Link>
-              <Link
-                href="/jobs/new"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block text-base font-medium text-gray-700 hover:text-indigo-600"
-              >
+              <Link href="/jobs/new" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-medium text-gray-700">
                 Post a Job
               </Link>
             </>
           )}
 
-          <Link
-            href="/donate"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="block text-base font-semibold text-emerald-700 hover:text-emerald-800"
-          >
+          <Link href="/donate" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-semibold text-emerald-700">
             ❤️ Donate
           </Link>
 
           <div className="border-t border-gray-100 pt-3">
             {user ? (
               <div className="space-y-2">
-                <div className="flex items-center space-x-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center">
-                    {userInitials}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                    <p className="text-xs text-gray-500">{user.email}</p>
-                  </div>
-                </div>
-                <Link
-                  href="/dashboard"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="block text-sm font-medium text-gray-700 hover:text-indigo-600"
-                >
-                  Dashboard
+                <p className="text-xs text-gray-400">Logged in as {user.email}</p>
+                <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="block text-sm font-medium text-gray-700">
+                  📊 Dashboard
                 </Link>
-                <Link
-                  href="/settings"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="block text-sm font-medium text-gray-700 hover:text-indigo-600"
-                >
-                  Settings & Mode Switch
+                <Link href="/settings" onClick={() => setIsMobileMenuOpen(false)} className="block text-sm font-bold text-indigo-600">
+                  ⚙️ Account Settings
                 </Link>
-                <button
-                  onClick={handleSignOut}
-                  className="block w-full text-left text-sm font-bold text-red-600 pt-2"
-                >
+                <button onClick={handleSignOut} className="block w-full text-left text-sm font-bold text-red-600 pt-2">
                   🚪 Sign Out
                 </button>
               </div>
             ) : (
               <div className="flex flex-col space-y-2 pt-1">
-                <Link
-                  href="/login"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="w-full text-center py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg"
-                >
+                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center py-2 text-sm font-medium text-gray-700 border rounded-lg">
                   Sign In
                 </Link>
-                <Link
-                  href="/signup"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="w-full text-center py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg"
-                >
+                <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg">
                   Get Started
                 </Link>
               </div>

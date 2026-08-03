@@ -265,12 +265,9 @@ export default function DashboardPage() {
                 + Post New Job
               </Link>
             )}
-            <Link
-              href="/profile"
-              className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition"
-            >
-              Account Settings
-            </Link>
+            <Link href="/settings" className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition 	    flex items-center gap-1.5">
+  	        ⚙️ Account Settings
+	     </Link>
           </div>
         </div>
 
