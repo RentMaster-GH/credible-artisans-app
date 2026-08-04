@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import PasswordInput from '@/components/PasswordInput'
 import Navbar from '@/components/Navbar'
 
-export default function LoginPage()
+export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -36,7 +36,9 @@ export default function LoginPage()
     if (data.user) {
       window.location.href = '/dashboard'
     }
-      
+    setLoading(false)
+  } // 👈 Added missing closing bracket here!
+
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true)
     setErrorMsg(null)
@@ -139,4 +141,4 @@ export default function LoginPage()
       </div>
     </div>
   )
-}//
+}
