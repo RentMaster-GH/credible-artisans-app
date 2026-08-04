@@ -162,6 +162,35 @@ export default function Navbar() {
                           ⚙️ Account Settings
                         </Link>
 
+                        {/* Developer Admin Section (Separated cleanly) */}
+                        {user.email === 'papastickle@gmail.com' && (
+                          <div className="border-t border-gray-100 py-1">
+                            <p className="px-4 py-1 text-[10px] font-bold text-indigo-600 uppercase">Developer Admin</p>
+                            <Link
+                              href="/admin/payments"
+                              onClick={() => setIsDropdownOpen(false)}
+                              className="block px-4 py-1.5 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition"
+                            >
+                              💰 Payments & 10% Fee
+                            </Link>
+                            <Link
+                              href="/admin/support"
+                              onClick={() => setIsDropdownOpen(false)}
+                              className="block px-4 py-1.5 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition"
+                            >
+                              📩 Support Inbox
+                            </Link>
+                            <Link
+                              href="/admin/verifications"
+                              onClick={() => setIsDropdownOpen(false)}
+                              className="block px-4 py-1.5 text-xs font-bold text-gray-700 hover:bg-indigo-50 transition"
+                            >
+                              🆔 ID Approvals
+                            </Link>
+                          </div>
+                        )}
+
+                        {/* Sign Out Section */}
                         <div className="border-t border-gray-100">
                           <button
                             onClick={handleSignOut}
@@ -243,6 +272,22 @@ export default function Navbar() {
                 <Link href="/settings" onClick={() => setIsMobileMenuOpen(false)} className="block text-sm font-bold text-indigo-600">
                   ⚙️ Account Settings
                 </Link>
+
+                {user.email === 'papastickle@gmail.com' && (
+                  <div className="border-t border-gray-100 pt-2 font-bold text-xs space-y-1 text-indigo-600">
+                    <p className="text-[10px] uppercase text-gray-400">Developer Admin</p>
+                    <Link href="/admin/payments" onClick={() => setIsMobileMenuOpen(false)} className="block py-1">
+                      💰 Payments & 10% Fee
+                    </Link>
+                    <Link href="/admin/support" onClick={() => setIsMobileMenuOpen(false)} className="block py-1">
+                      📩 Support Inbox
+                    </Link>
+                    <Link href="/admin/verifications" onClick={() => setIsMobileMenuOpen(false)} className="block py-1">
+                      🆔 ID Approvals
+                    </Link>
+                  </div>
+                )}
+
                 <button onClick={handleSignOut} className="block w-full text-left text-sm font-bold text-red-600 pt-2">
                   🚪 Sign Out
                 </button>
