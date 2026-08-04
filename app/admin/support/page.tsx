@@ -14,7 +14,7 @@ interface Ticket {
   user_id: string | null
 }
 
-const DEVELOPER_EMAIL = 'your-email@example.com' // Replace with your developer email
+const DEVELOPER_EMAIL = 'papastickle@gmail.com' // 👈 Updated to your email!
 
 export default function AdminSupportPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -43,12 +43,12 @@ export default function AdminSupportPage() {
   const fetchTickets = async () => {
     setLoading(true)
     const { data, error } = await supabase
-      .from('support_tickets')
+      .from('customer_support')
       .select('*')
       .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setTickets(data as Ticket[])
+      setTickets(data as unknown as Ticket[])
     }
     setLoading(false)
   }
@@ -56,8 +56,8 @@ export default function AdminSupportPage() {
   const toggleStatus = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'open' ? 'resolved' : 'open'
     const { error } = await supabase
-      .from('support_tickets')
-      .update({ status: newStatus })
+      .from('customer_support')
+      .update({ status: newStatus } as any)
       .eq('id', id)
 
     if (!error) {
