@@ -76,11 +76,29 @@ export default function DashboardPage() {
       setUser(user)
 
       // 2. Fetch user profile
-      const { data: profileData } = await supabase
+      let { data: profileData } = await supabase
         .from('profiles')
         .select('role, full_name')
         .eq('id', user.id)
         .single()
+
+      // ✅ FIX FOR GOOGLE OAUTH: If profile row doesn't exist, create it automatically!
+      if (!profileData) {
+        const googleName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email?.split('@')[0] ||
+          'Valued User'
+        const googleRole = user.user_metadata?.role || 'client'
+
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          full_name: googleName,
+          role: googleRole,
+        } as any)
+
+        profileData = { role: googleRole, full_name: googleName }
+      }
 
       const role = profileData?.role || user.user_metadata?.role || 'client'
       setUserRole(role)
@@ -265,9 +283,12 @@ export default function DashboardPage() {
                 + Post New Job
               </Link>
             )}
-            <Link href="/settings" className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition 	    flex items-center gap-1.5">
-  	        ⚙️ Account Settings
-	     </Link>
+            <Link
+              href="/settings"
+              className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition flex items-center gap-1.5"
+            >
+              ⚙️ Account Settings
+            </Link>
           </div>
         </div>
 
