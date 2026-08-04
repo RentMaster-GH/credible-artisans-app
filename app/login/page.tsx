@@ -37,7 +37,7 @@ export default function LoginPage() {
       window.location.href = '/dashboard'
     }
     setLoading(false)
-  } // 👈 Added missing closing bracket here!
+  }
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true)
@@ -58,6 +58,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
+      {/* Fixed: Use <Navbar /> without hideAuthButtons prop */}
       <Navbar />
 
       <div className="max-w-md mx-auto pt-16 px-4">
