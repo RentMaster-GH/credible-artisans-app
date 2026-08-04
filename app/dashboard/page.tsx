@@ -106,11 +106,28 @@ export default function DashboardPage() {
 
       // 3. If Artisan, fetch artisan profile and submitted bids
       if (role === 'artisan') {
-        const { data: artProfile } = await supabase
+        let { data: artProfile } = await supabase
           .from('artisans')
           .select('*')
           .eq('id', user.id)
           .single()
+
+        // If Google user switched to Artisan, auto-create artisans table row if missing
+        if (!artProfile) {
+          await supabase.from('artisans').upsert({
+            id: user.id,
+            business_name: (profileData?.full_name || 'Artisan') + ' Services',
+            primary_skill: 'General Artisan',
+          } as any)
+
+          const { data: newArtProfile } = await supabase
+            .from('artisans')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+
+          artProfile = newArtProfile
+        }
 
         if (artProfile) {
           setArtisanProfile(artProfile as unknown as ArtisanProfile)
@@ -176,6 +193,31 @@ export default function DashboardPage() {
 
     fetchDashboardData()
   }, [router, supabase])
+
+  // Instant Mode Switcher Handler
+  const handleSwitchRole = async (newRole: 'client' | 'artisan') => {
+    setLoading(true)
+
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      role: newRole,
+      full_name: fullName,
+    } as any)
+
+    if (newRole === 'artisan') {
+      await supabase.from('artisans').upsert({
+        id: user.id,
+        business_name: fullName + ' Trade Services',
+        primary_skill: 'General Artisan',
+      } as any)
+    }
+
+    await supabase.auth.updateUser({
+      data: { role: newRole }
+    })
+
+    window.location.reload()
+  }
 
   const handleClientBidAction = async (bidId: string, jobId: string, newStatus: 'accepted' | 'rejected') => {
     setActionLoading(bidId)
@@ -250,7 +292,7 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         
         {/* Welcome Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-sm">
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
@@ -292,6 +334,27 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* 🌟 INSTANT MODE SWITCHER BANNER FOR GOOGLE & NEW USERS */}
+        <div className="mb-8 p-5 bg-gradient-to-r from-indigo-900 to-indigo-800 text-white rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+              Active Role: {userRole === 'artisan' ? '🛠️ Artisan (Worker)' : '👤 Client (Hiring)'}
+            </p>
+            <p className="text-sm font-medium text-indigo-100 mt-1">
+              {userRole === 'client'
+                ? 'Want to offer trade services, submit bids, and get hired? Switch to Artisan Mode!'
+                : 'Want to post jobs and hire local artisans? Switch to Client Mode!'}
+            </p>
+          </div>
+
+          <button
+            onClick={() => handleSwitchRole(userRole === 'client' ? 'artisan' : 'client')}
+            className="bg-white hover:bg-gray-100 text-indigo-900 font-extrabold text-xs px-5 py-3 rounded-xl transition shadow-sm shrink-0"
+          >
+            Switch to {userRole === 'client' ? '🛠️ Artisan Mode' : '👤 Client Mode'}
+          </button>
+        </div>
+
         {errorMsg && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
             {errorMsg}
@@ -306,7 +369,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                 <p className="text-xs text-gray-400 uppercase font-medium">Primary Trade Skill</p>
-                <p className="text-lg font-bold text-gray-900 mt-1">{artisanProfile?.primary_skill || 'Not Specified'}</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{artisanProfile?.primary_skill || 'General Artisan'}</p>
               </div>
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                 <p className="text-xs text-gray-400 uppercase font-medium">Artisan Rating</p>
