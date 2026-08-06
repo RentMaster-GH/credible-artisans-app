@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 
@@ -14,6 +14,7 @@ export default function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
 
   useEffect(() => {
@@ -202,23 +203,7 @@ export default function Navbar() {
                       </div>
                     )}
                   </div>
-                ) : (
-                  /* USER IS NOT LOGGED IN -> SHOW SIGN IN / GET STARTED */
-                  <div className="flex items-center space-x-3">
-                    <Link
-                      href="/login"
-                      className="text-sm font-medium text-gray-700 hover:text-indigo-600 px-3 py-2 transition"
-                    >
-                      Sign In
-                    </Link>
-                    <Link
-                      href="/signup"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition"
-                    >
-                      Get Started
-                    </Link>
-                  </div>
-                )}
+                ) : null}
               </>
             )}
           </div>
@@ -263,7 +248,7 @@ export default function Navbar() {
           </Link>
 
           <div className="border-t border-gray-100 pt-3">
-            {user ? (
+            {user && (
               <div className="space-y-2">
                 <p className="text-xs text-gray-400">Logged in as {user.email}</p>
                 <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="block text-sm font-medium text-gray-700">
@@ -291,15 +276,6 @@ export default function Navbar() {
                 <button onClick={handleSignOut} className="block w-full text-left text-sm font-bold text-red-600 pt-2">
                   🚪 Sign Out
                 </button>
-              </div>
-            ) : (
-              <div className="flex flex-col space-y-2 pt-1">
-                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center py-2 text-sm font-medium text-gray-700 border rounded-lg">
-                  Sign In
-                </Link>
-                <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)} className="w-full text-center py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg">
-                  Get Started
-                </Link>
               </div>
             )}
           </div>
