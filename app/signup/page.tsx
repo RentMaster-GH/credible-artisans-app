@@ -1,41 +1,46 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import PasswordInput from '@/components/PasswordInput'
-import Navbar from '@/components/Navbar'
-import { WORLD_COUNTRIES } from '@/lib/countries'
 
-export default function ComprehensiveSignupPage() {
+export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [location, setLocation] = useState('Ghana')
-  const [role, setRole] = useState<'client' | 'artisan'>('client')
-
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [role, setRole] = useState<'artisan' | 'client'>('artisan')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setErrorMsg(null)
 
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please check and try again.')
+      return
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.')
+      return
+    }
+
+    setLoading(true)
+
+    // 1. Sign up the user with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password: password,
+      email,
+      password,
       options: {
         data: {
           full_name: fullName,
           role: role,
-          phone_number: phoneNumber,
-          location: location,
         },
       },
     })
@@ -46,147 +51,121 @@ export default function ComprehensiveSignupPage() {
       return
     }
 
+    // 2. Insert or update the profile row in the profiles table
     if (authData.user) {
-      await supabase.from('profiles').upsert({
+      const { error: profileError } = await (supabase.from('profiles') as any).upsert({
         id: authData.user.id,
         full_name: fullName,
         role: role,
-        phone_number: phoneNumber,
+        updated_at: new Date().toISOString(),
       })
 
-      window.location.href = '/dashboard'
+      if (profileError) {
+        console.warn('Notice updating profile table:', profileError.message)
+      }
     }
 
     setLoading(false)
+    router.push('/artisans')
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <Navbar />
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center">
+          <span className="text-3xl">🛠️</span>
+        </div>
+        <h2 className="mt-4 text-center text-2xl font-extrabold text-gray-900 tracking-tight">
+          Create your account
+        </h2>
+        <p className="mt-1 text-center text-xs text-gray-500">
+          Already have an account?{' '}
+          <Link href="/login" className="font-semibold text-emerald-600 hover:text-emerald-500">
+            Log in
+          </Link>
+        </p>
+      </div>
 
-      <div className="max-w-xl mx-auto pt-10 px-4">
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-10 shadow-sm">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Create Your Account</h1>
-            <p className="text-gray-500 text-xs sm:text-sm mt-1">
-              Join Credible Artisans to hire professionals or offer your services.
-            </p>
-          </div>
-
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
+        <div className="bg-white py-8 px-6 shadow-sm border border-gray-200 rounded-2xl sm:px-10">
+          
           {errorMsg && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
+            <div className="mb-4 p-3 text-xs rounded-xl bg-red-50 text-red-700 border border-red-200">
               {errorMsg}
             </div>
           )}
 
-          <form onSubmit={handleSignUp} className="space-y-5">
+          <form onSubmit={handleSignup} className="space-y-4">
+            
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                I am joining as a:
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setRole('client')}
-                  className={`p-3 rounded-xl border text-center transition font-semibold text-xs ${
-                    role === 'client'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  👤 Client (Hiring)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setRole('artisan')}
-                  className={`p-3 rounded-xl border text-center transition font-semibold text-xs ${
-                    role === 'artisan'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  🛠️ Artisan (Worker)
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Kwame Mensah"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="John Doe"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="kwame@example.com"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Phone / WhatsApp Number</label>
-                <input
-                  type="tel"
-                  required
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+233 24 000 0000"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+              />
             </div>
 
-            {/* Country Selector with All World Countries */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Country / Primary Location</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">I want to join as a</label>
               <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-indigo-500"
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'artisan' | 'client')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none bg-white focus:ring-2 focus:ring-emerald-500"
               >
-                {WORLD_COUNTRIES.map((country) => (
-                  <option key={country} value={country}>
-                    {country}
-                  </option>
-                ))}
+                <option value="artisan">🛠️ Artisan (Offering Services)</option>
+                <option value="client">👤 Client (Hiring & Posting Jobs)</option>
               </select>
             </div>
 
-            <PasswordInput
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              label="Account Password"
-              placeholder="Min 6 characters"
-            />
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Password</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Confirm Password</label>
+              <input
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-sm"
+              className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm"
             >
-              {loading ? 'Creating Account...' : 'Complete Sign Up'}
+              {loading ? 'Creating account...' : 'Sign Up'}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-gray-500">
-            Already have an account?{' '}
-            <Link href="/login" className="text-indigo-600 font-bold hover:underline">
-              Sign In
-            </Link>
-          </div>
         </div>
       </div>
     </div>
