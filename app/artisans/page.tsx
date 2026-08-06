@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { User } from '@supabase/supabase-js'
 import Navbar from '@/components/Navbar'
 
 interface Artisan {
@@ -14,6 +16,7 @@ interface Artisan {
   rating: number | null
   bio: string | null
   avatar_url: string | null
+  is_available?: boolean
 }
 
 const SKILLS = [
@@ -36,17 +39,51 @@ export default function ArtisanDirectoryPage() {
   const [selectedSkill, setSelectedSkill] = useState('All Skills')
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => {
-    const supabase = createClient()
+  // Current User & Settings Drawer States
+  const [user, setUser] = useState<User | null>(null)
+  const [userProfile, setUserProfile] = useState<Artisan | null>(null)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
 
-    const fetchArtisans = async () => {
+  // Quick-Settings Form States for logged-in Artisan
+  const [isAvailable, setIsAvailable] = useState(true)
+  const [hourlyRate, setHourlyRate] = useState<string>('')
+  const [bio, setBio] = useState<string>('')
+
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    const fetchSessionAndData = async () => {
       setLoading(true)
-      let query = supabase
+
+      // 1. Check logged-in user session
+      const { data: { session } } = await supabase.auth.getSession()
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+
+      if (currentUser) {
+        // Fetch specific profile data for quick settings drawer
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single()
+
+        if (profileData) {
+          setUserProfile(profileData as Artisan)
+          setIsAvailable(profileData.is_available ?? true)
+          setHourlyRate(profileData.hourly_rate ? profileData.hourly_rate.toString() : '')
+          setBio(profileData.bio || '')
+        }
+      }
+
+      // 2. Fetch all artisans for the directory
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('full_name', { ascending: true })
-
-      const { data, error } = await query
 
       if (error) {
         console.warn('Notice fetching artisans:', error.message)
@@ -56,8 +93,44 @@ export default function ArtisanDirectoryPage() {
       setLoading(false)
     }
 
-    fetchArtisans()
-  }, [])
+    fetchSessionAndData()
+  }, [supabase])
+
+  // Handle Logout action
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    setUserProfile(null)
+    router.push('/login')
+  }
+
+  // Handle Quick-Settings Form Save
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    setSavingSettings(true)
+    setSettingsMsg(null)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_available: isAvailable,
+        hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
+        bio: bio.trim(),
+      })
+      .eq('id', user.id)
+
+    if (error) {
+      setSettingsMsg('Failed to update settings: ' + error.message)
+    } else {
+      setSettingsMsg('Settings updated successfully!')
+      // Refresh local directory data list
+      const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true })
+      if (data) setArtisans(data as unknown as Artisan[])
+    }
+    setSavingSettings(false)
+  }
 
   const filteredArtisans = artisans.filter((artisan) => {
     const matchesSearch =
@@ -83,7 +156,7 @@ export default function ArtisanDirectoryPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         
-        {/* Header Section */}
+        {/* Header Section & Quick-Settings Button (Visible if logged in) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Artisan Directory</h1>
@@ -91,7 +164,101 @@ export default function ArtisanDirectoryPage() {
               Find and hire verified local professionals for your projects.
             </p>
           </div>
+
+          {user && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm"
+              >
+                ⚙️ Artisan Quick Settings
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 text-gray-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm"
+              >
+                🚪 Sign Out
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Account Management Quick-Settings Drawer / Panel */}
+        {isSettingsOpen && user && (
+          <div className="bg-white rounded-2xl border border-indigo-100 shadow-md p-6 mb-8 transition animate-fadeIn">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Account Quick-Settings</h3>
+                <p className="text-xs text-gray-500">Manage your directory status and public profile information.</p>
+              </div>
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {settingsMsg && (
+              <div className={`mb-4 p-3 text-xs rounded-xl ${settingsMsg.includes('success') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {settingsMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSettings} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Availability Toggle */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-2">Directory Status</label>
+                <div className="flex items-center space-x-3 mt-2">
+                  <input
+                    type="checkbox"
+                    checked={isAvailable}
+                    onChange={(e) => setIsAvailable(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-xs font-medium text-gray-800">
+                    {isAvailable ? '🟢 Active & Accepting Jobs' : '🔴 Away / Inactive'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Hourly Rate */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Hourly Rate (GHS)</label>
+                <input
+                  type="number"
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(e.target.value)}
+                  placeholder="e.g. 50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Bio summary */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Short Bio</label>
+                <input
+                  type="text"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Professional description..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="md:col-span-3 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingSettings}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-sm"
+                >
+                  {savingSettings ? 'Saving changes...' : 'Save Quick Settings'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Filters & Search Toolbar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -140,13 +307,15 @@ export default function ArtisanDirectoryPage() {
                     className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between"
                   >
                     <div>
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 bg-emerald-100 text-emerald-700 font-bold rounded-full flex items-center justify-center text-lg">
-                          {artisan.full_name ? artisan.full_name.charAt(0).toUpperCase() : 'A'}
-                        </div>
-                        <div>
-                          <h2 className="text-base font-bold text-gray-900">{artisan.full_name}</h2>
-                          <p className="text-xs text-gray-400">📍 {artisan.location || 'Cape Coast'}</p>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-emerald-100 text-emerald-700 font-bold rounded-full flex items-center justify-center text-lg">
+                            {artisan.full_name ? artisan.full_name.charAt(0).toUpperCase() : 'A'}
+                          </div>
+                          <div>
+                            <h2 className="text-base font-bold text-gray-900">{artisan.full_name}</h2>
+                            <p className="text-xs text-gray-400">📍 {artisan.location || 'Cape Coast'}</p>
+                          </div>
                         </div>
                       </div>
 
