@@ -17,6 +17,7 @@ interface Artisan {
   bio: string | null
   avatar_url: string | null
   is_available?: boolean
+  role?: string | null
 }
 
 const SKILLS = [
@@ -39,14 +40,15 @@ export default function ArtisanDirectoryPage() {
   const [selectedSkill, setSelectedSkill] = useState('All Skills')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Current User & Settings Drawer States
+  // Current User & Role States
   const [user, setUser] = useState<User | null>(null)
-  const [userProfile, setUserProfile] = useState<Artisan | null>(null)
+  const [userRole, setUserRole] = useState<'artisan' | 'client'>('artisan')
+  const [switchingRole, setSwitchingRole] = useState(false)
+
+  // Settings Drawer States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
-
-  // Quick-Settings Form States for logged-in Artisan
   const [isAvailable, setIsAvailable] = useState(true)
   const [hourlyRate, setHourlyRate] = useState<string>('')
   const [bio, setBio] = useState<string>('')
@@ -64,7 +66,7 @@ export default function ArtisanDirectoryPage() {
       setUser(currentUser)
 
       if (currentUser) {
-        // Fetch specific profile data for quick settings drawer
+        // Fetch specific profile data
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -73,7 +75,8 @@ export default function ArtisanDirectoryPage() {
 
         if (profileData) {
           const typedProfile = profileData as unknown as Artisan
-          setUserProfile(typedProfile)
+          const activeRole = typedProfile.role === 'client' ? 'client' : 'artisan'
+          setUserRole(activeRole)
           setIsAvailable(typedProfile.is_available ?? true)
           setHourlyRate(typedProfile.hourly_rate ? typedProfile.hourly_rate.toString() : '')
           setBio(typedProfile.bio || '')
@@ -97,11 +100,33 @@ export default function ArtisanDirectoryPage() {
     fetchSessionAndData()
   }, [supabase])
 
+  // Handle Mode Switch (Artisan <-> Client)
+  const handleToggleRole = async () => {
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    setSwitchingRole(true)
+    const newRole = userRole === 'artisan' ? 'client' : 'artisan'
+
+    // Update in Supabase profiles table
+    const { error } = await (supabase.from('profiles') as any)
+      .update({ role: newRole })
+      .eq('id', user.id)
+
+    if (!error) {
+      setUserRole(newRole)
+    } else {
+      console.error('Failed to switch role:', error.message)
+    }
+    setSwitchingRole(false)
+  }
+
   // Handle Logout action
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setUser(null)
-    setUserProfile(null)
     router.push('/login')
   }
 
@@ -125,7 +150,6 @@ export default function ArtisanDirectoryPage() {
       setSettingsMsg('Failed to update settings: ' + error.message)
     } else {
       setSettingsMsg('Settings updated successfully!')
-      // Refresh local directory data list
       const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true })
       if (data) setArtisans(data as unknown as Artisan[])
     }
@@ -156,7 +180,40 @@ export default function ArtisanDirectoryPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         
-        {/* Header Section & Quick-Settings Button (Visible if logged in) */}
+        {/* Dynamic Active Role Banner & Switcher */}
+        {user && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">
+                {userRole === 'artisan' ? '🛠️' : '👤'}
+              </span>
+              <div>
+                <p className="text-xs font-bold text-indigo-900 uppercase tracking-wider">
+                  ACTIVE ROLE: {userRole === 'artisan' ? '🛠️ ARTISAN (WORKER)' : '👤 CLIENT (HIRING)'}
+                </p>
+                <p className="text-xs text-indigo-700 mt-0.5">
+                  {userRole === 'artisan'
+                    ? 'Want to post jobs and hire local artisans? Switch to Client Mode!'
+                    : 'Looking to offer your artisan services? Switch to Artisan Mode!'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleToggleRole}
+              disabled={switchingRole}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm whitespace-nowrap"
+            >
+              {switchingRole
+                ? 'Switching...'
+                : userRole === 'artisan'
+                ? 'Switch to 👤 Client Mode'
+                : 'Switch to 🛠️ Artisan Mode'}
+            </button>
+          </div>
+        )}
+
+        {/* Header Section & Quick-Settings Button */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Artisan Directory</h1>
@@ -165,7 +222,7 @@ export default function ArtisanDirectoryPage() {
             </p>
           </div>
 
-          {user && (
+          {user && userRole === 'artisan' && (
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
@@ -183,8 +240,8 @@ export default function ArtisanDirectoryPage() {
           )}
         </div>
 
-        {/* Account Management Quick-Settings Drawer / Panel */}
-        {isSettingsOpen && user && (
+        {/* Account Management Quick-Settings Drawer (Artisan Mode Only) */}
+        {isSettingsOpen && user && userRole === 'artisan' && (
           <div className="bg-white rounded-2xl border border-indigo-100 shadow-md p-6 mb-8 transition animate-fadeIn">
             <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
               <div>
@@ -206,8 +263,6 @@ export default function ArtisanDirectoryPage() {
             )}
 
             <form onSubmit={handleSaveSettings} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Availability Toggle */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-2">Directory Status</label>
                 <div className="flex items-center space-x-3 mt-2">
@@ -223,7 +278,6 @@ export default function ArtisanDirectoryPage() {
                 </div>
               </div>
 
-              {/* Hourly Rate */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Hourly Rate (GHS)</label>
                 <input
@@ -235,7 +289,6 @@ export default function ArtisanDirectoryPage() {
                 />
               </div>
 
-              {/* Bio summary */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Short Bio</label>
                 <input
