@@ -64,7 +64,7 @@ export default function ArtisanDirectoryPage() {
       setUser(currentUser)
 
       if (currentUser) {
-        // Fetch specific profile data for quick settings drawer
+        // Fetch specific profile data for quick settings drawer (fixed type casting)
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -72,10 +72,11 @@ export default function ArtisanDirectoryPage() {
           .single()
 
         if (profileData) {
-          setUserProfile(profileData as Artisan)
-          setIsAvailable(profileData.is_available ?? true)
-          setHourlyRate(profileData.hourly_rate ? profileData.hourly_rate.toString() : '')
-          setBio(profileData.bio || '')
+          const typedProfile = profileData as unknown as Artisan
+          setUserProfile(typedProfile)
+          setIsAvailable(typedProfile.is_available ?? true)
+          setHourlyRate(typedProfile.hourly_rate ? typedProfile.hourly_rate.toString() : '')
+          setBio(typedProfile.bio || '')
         }
       }
 
