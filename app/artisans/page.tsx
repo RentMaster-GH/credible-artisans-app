@@ -111,7 +111,7 @@ export default function ArtisanDirectoryPage() {
     fetchSessionAndData()
   }, [supabase])
 
-  // Handle Mode Switch (Artisan <-> Client)
+  // Handle Mode Switch (Artisan <-> Client) with immediate router refresh
   const handleToggleRole = async () => {
     if (!user) {
       router.push('/login')
@@ -128,9 +128,9 @@ export default function ArtisanDirectoryPage() {
 
     if (!error) {
       setUserRole(newRole)
-      // Close open drawers when switching roles
       setIsSettingsOpen(false)
       setIsClientSettingsOpen(false)
+      router.refresh()
     } else {
       console.error('Failed to switch role:', error.message)
     }
