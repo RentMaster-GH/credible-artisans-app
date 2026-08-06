@@ -113,13 +113,15 @@ export default function ArtisanDirectoryPage() {
     setSavingSettings(true)
     setSettingsMsg(null)
 
+    const updateData: Record<string, any> = {
+      is_available: isAvailable,
+      hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
+      bio: bio.trim(),
+    }
+
     const { error } = await supabase
       .from('profiles')
-      .update({
-        is_available: isAvailable,
-        hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
-        bio: bio.trim(),
-      })
+      .update(updateData)
       .eq('id', user.id)
 
     if (error) {
