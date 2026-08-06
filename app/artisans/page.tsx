@@ -18,6 +18,8 @@ interface Artisan {
   avatar_url: string | null
   is_available?: boolean
   role?: string | null
+  client_company?: string | null
+  client_phone?: string | null
 }
 
 const SKILLS = [
@@ -45,13 +47,20 @@ export default function ArtisanDirectoryPage() {
   const [userRole, setUserRole] = useState<'artisan' | 'client'>('artisan')
   const [switchingRole, setSwitchingRole] = useState(false)
 
-  // Settings Drawer States
+  // Artisan Settings Drawer States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null)
   const [isAvailable, setIsAvailable] = useState(true)
   const [hourlyRate, setHourlyRate] = useState<string>('')
   const [bio, setBio] = useState<string>('')
+
+  // Client Quick Settings States
+  const [isClientSettingsOpen, setIsClientSettingsOpen] = useState(false)
+  const [savingClientSettings, setSavingClientSettings] = useState(false)
+  const [clientSettingsMsg, setClientSettingsMsg] = useState<string | null>(null)
+  const [clientCompany, setClientCompany] = useState<string>('')
+  const [clientPhone, setClientPhone] = useState<string>('')
 
   const router = useRouter()
   const supabase = createClient()
@@ -80,6 +89,8 @@ export default function ArtisanDirectoryPage() {
           setIsAvailable(typedProfile.is_available ?? true)
           setHourlyRate(typedProfile.hourly_rate ? typedProfile.hourly_rate.toString() : '')
           setBio(typedProfile.bio || '')
+          setClientCompany(typedProfile.client_company || '')
+          setClientPhone(typedProfile.client_phone || '')
         }
       }
 
@@ -117,6 +128,9 @@ export default function ArtisanDirectoryPage() {
 
     if (!error) {
       setUserRole(newRole)
+      // Close open drawers when switching roles
+      setIsSettingsOpen(false)
+      setIsClientSettingsOpen(false)
     } else {
       console.error('Failed to switch role:', error.message)
     }
@@ -130,7 +144,7 @@ export default function ArtisanDirectoryPage() {
     router.push('/login')
   }
 
-  // Handle Quick-Settings Form Save
+  // Handle Artisan Quick-Settings Form Save
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
@@ -154,6 +168,29 @@ export default function ArtisanDirectoryPage() {
       if (data) setArtisans(data as unknown as Artisan[])
     }
     setSavingSettings(false)
+  }
+
+  // Handle Client Quick-Settings Form Save
+  const handleSaveClientSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    setSavingClientSettings(true)
+    setClientSettingsMsg(null)
+
+    const { error } = await (supabase.from('profiles') as any)
+      .update({
+        client_company: clientCompany.trim(),
+        client_phone: clientPhone.trim(),
+      })
+      .eq('id', user.id)
+
+    if (error) {
+      setClientSettingsMsg('Failed to update client settings: ' + error.message)
+    } else {
+      setClientSettingsMsg('Client settings updated successfully!')
+    }
+    setSavingClientSettings(false)
   }
 
   const filteredArtisans = artisans.filter((artisan) => {
@@ -213,7 +250,7 @@ export default function ArtisanDirectoryPage() {
           </div>
         )}
 
-        {/* Header Section & Quick-Settings Button */}
+        {/* Header Section & Action Buttons */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Artisan Directory</h1>
@@ -222,14 +259,23 @@ export default function ArtisanDirectoryPage() {
             </p>
           </div>
 
-          {user && userRole === 'artisan' && (
+          {user && (
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm"
-              >
-                ⚙️ Artisan Quick Settings
-              </button>
+              {userRole === 'artisan' ? (
+                <button
+                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm"
+                >
+                  ⚙️ Artisan Quick Settings
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsClientSettingsOpen(!isClientSettingsOpen)}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm"
+                >
+                  ⚙️ Client Quick Settings
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 bg-white border border-gray-200 hover:bg-red-50 hover:text-red-600 text-gray-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm"
@@ -240,12 +286,12 @@ export default function ArtisanDirectoryPage() {
           )}
         </div>
 
-        {/* Account Management Quick-Settings Drawer (Artisan Mode Only) */}
+        {/* Artisan Quick-Settings Drawer (Visible in Artisan Mode) */}
         {isSettingsOpen && user && userRole === 'artisan' && (
           <div className="bg-white rounded-2xl border border-indigo-100 shadow-md p-6 mb-8 transition animate-fadeIn">
             <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Account Quick-Settings</h3>
+                <h3 className="text-sm font-bold text-gray-900">Artisan Quick-Settings</h3>
                 <p className="text-xs text-gray-500">Manage your directory status and public profile information.</p>
               </div>
               <button
@@ -307,6 +353,64 @@ export default function ArtisanDirectoryPage() {
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-sm"
                 >
                   {savingSettings ? 'Saving changes...' : 'Save Quick Settings'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Client Quick-Settings Drawer (Visible in Client Mode) */}
+        {isClientSettingsOpen && user && userRole === 'client' && (
+          <div className="bg-white rounded-2xl border border-indigo-100 shadow-md p-6 mb-8 transition animate-fadeIn">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Client Quick Settings</h3>
+                <p className="text-xs text-gray-500">Manage your hiring preferences and company details.</p>
+              </div>
+              <button
+                onClick={() => setIsClientSettingsOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {clientSettingsMsg && (
+              <div className={`mb-4 p-3 text-xs rounded-xl ${clientSettingsMsg.includes('success') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {clientSettingsMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveClientSettings} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Company / Project Name</label>
+                <input
+                  type="text"
+                  value={clientCompany}
+                  onChange={(e) => setClientCompany(e.target.value)}
+                  placeholder="e.g. Acme Construction Ltd"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Contact Phone Number</label>
+                <input
+                  type="text"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="e.g. +233 24 000 0000"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="md:col-span-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingClientSettings}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-sm"
+                >
+                  {savingClientSettings ? 'Saving client settings...' : 'Save Client Settings'}
                 </button>
               </div>
             </form>
