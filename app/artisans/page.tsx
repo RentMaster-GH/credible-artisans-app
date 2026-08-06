@@ -64,7 +64,7 @@ export default function ArtisanDirectoryPage() {
       setUser(currentUser)
 
       if (currentUser) {
-        // Fetch specific profile data for quick settings drawer (fixed type casting)
+        // Fetch specific profile data for quick settings drawer
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
@@ -113,15 +113,12 @@ export default function ArtisanDirectoryPage() {
     setSavingSettings(true)
     setSettingsMsg(null)
 
-    const updateData: Record<string, any> = {
-      is_available: isAvailable,
-      hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
-      bio: bio.trim(),
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .update(updateData)
+    const { error } = await (supabase.from('profiles') as any)
+      .update({
+        is_available: isAvailable,
+        hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
+        bio: bio.trim(),
+      })
       .eq('id', user.id)
 
     if (error) {
