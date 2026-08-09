@@ -16,9 +16,9 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
   const [headline, setHeadline] = useState('');
   const [category, setCategory] = useState('Carpentry');
   const [contactPhone, setContactPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [currency, setCurrency] = useState<AdCurrency>('GHS');
-  const [paymentRef, setPaymentRef] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -27,55 +27,88 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
 
   const currentPricing = AD_PRICING[currency];
 
+  // Load Paystack Inline JS for Mobile Money Prompt
+  const loadPaystackScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).PaystackPop) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.onload = () => resolve(true);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
+      await loadPaystackScript();
       const { data: userData } = await supabase.auth.getUser();
 
-      const { error: insertError } = await supabase.from('advertisements').insert({
-        artisan_id: userData?.user?.id || null,
-        shop_name: shopName,
-        headline,
-        category,
-        contact_phone: contactPhone,
-        image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
-        amount_paid: currentPricing.amount,
-        currency,
-        payment_reference: paymentRef || 'DIRECT_AUTH_PROMO',
-        status: 'active',
+      // Paystack Key (Uses Public Key or Fallback Test)
+      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
+
+      // Trigger Paystack Mobile Money Pop-up / Prompt
+      const handler = (window as any).PaystackPop.setup({
+        key: paystackPublicKey,
+        email: email || userData?.user?.email || 'advertiser@credibleartisans.com',
+        amount: currentPricing.amount * 100, // Amount in lowest subunit (pesewas/cents)
+        currency: currency,
+        ref: 'AD_' + Math.floor(Math.random() * 1000000000 + 1),
+        onClose: () => {
+          setLoading(false);
+          setError('Payment popup closed. Ad was not published.');
+        },
+        callback: async (response: any) => {
+          // Payment Successful -> Save Ad to Database
+          const { error: insertError } = await supabase.from('advertisements').insert({
+            artisan_id: userData?.user?.id || null,
+            shop_name: shopName,
+            headline,
+            category,
+            contact_phone: contactPhone,
+            image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
+            amount_paid: currentPricing.amount,
+            currency,
+            payment_reference: response.reference,
+            status: 'active',
+          });
+
+          if (insertError) {
+            setError(insertError.message);
+          } else {
+            setSubmitted(true);
+            if (onSuccess) onSuccess();
+          }
+          setLoading(false);
+        },
       });
 
-      if (insertError) throw insertError;
-
-      setSubmitted(true);
-      if (onSuccess) onSuccess();
+      handler.openIframe();
     } catch (err: any) {
-      setError(err.message || 'Failed to submit advertisement.');
-    } finally {
+      setError(err.message || 'Unable to trigger payment prompt.');
       setLoading(false);
     }
   };
 
   return (
-    /* Dark Backdrop - Clicking outside closes the modal */
     <div 
       onClick={onClose} 
       className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto"
     >
-      {/* Modal Box - Stops propagation so clicking inside does not close */}
       <div 
         onClick={(e) => e.stopPropagation()} 
-        className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border relative my-8 border-gray-100"
+        className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border relative my-8"
       >
-        {/* Highly Visible Prominent Close (X) Button */}
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close modal"
-          className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-black font-extrabold text-lg transition shadow-sm z-30 cursor-pointer"
+          className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold"
         >
           ✕
         </button>
@@ -83,43 +116,33 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
         {!submitted ? (
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div>
-              <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+              <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full uppercase">
                 Self-Service Promo
               </span>
-              <h2 className="text-xl font-bold text-gray-900 mt-2 pr-8">
-                📢 Advertise Your Shop Here
-              </h2>
-              <p className="text-xs text-gray-500">
-                Feature your brand on our Auth Screen seen by thousands of visiting clients daily!
-              </p>
+              <h2 className="text-xl font-bold text-gray-900 mt-2">📢 Advertise Your Shop Here</h2>
+              <p className="text-xs text-gray-500">Feature your shop on our Auth Screen seen by thousands daily!</p>
             </div>
 
             {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-md">{error}</div>}
 
-            {/* Currency & Pricing Selector */}
             <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex justify-between items-center">
               <div>
-                <p className="text-xs text-amber-900 font-bold">Promotion Fee (30 Days)</p>
-                <p className="text-lg font-extrabold text-amber-700">
-                  {currentPricing.symbol} {currentPricing.amount}
-                </p>
+                <p className="text-xs text-amber-900 font-bold">30 Days Promotion Fee</p>
+                <p className="text-lg font-extrabold text-amber-700">{currentPricing.symbol} {currentPricing.amount}</p>
               </div>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value as AdCurrency)}
-                className="text-xs font-semibold border rounded p-1.5 bg-white text-gray-800"
+                className="text-xs font-semibold border rounded p-1.5 bg-white"
               >
                 {Object.entries(AD_PRICING).map(([key, val]) => (
-                  <option key={key} value={key}>
-                    {val.label}
-                  </option>
+                  <option key={key} value={key}>{val.label}</option>
                 ))}
               </select>
             </div>
 
-            {/* Shop Name */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Shop / Business Name *</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Shop Name *</label>
               <input
                 type="text"
                 required
@@ -130,21 +153,19 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
               />
             </div>
 
-            {/* Headline / Offer */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Headline / Promotional Offer *</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Headline / Offer *</label>
               <input
                 type="text"
                 required
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
-                placeholder="e.g. Quality Custom Wardrobes & Kitchen Cabinets in Accra"
+                placeholder="e.g. Custom Wardrobes & Kitchen Cabinets in Accra"
                 className="w-full border rounded-lg p-2.5 text-sm"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              {/* Category */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Category *</label>
                 <select
@@ -155,69 +176,62 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
                   <option value="Carpentry">Carpentry & Furniture</option>
                   <option value="Plumbing">Plumbing</option>
                   <option value="Electrical">Electrical</option>
-                  <option value="Masonry">Masonry / Construction</option>
-                  <option value="Painting">Painting</option>
-                  <option value="Welding">Welding / Fabrication</option>
+                  <option value="Masonry">Masonry</option>
+                  <option value="Welding">Welding</option>
                   <option value="Other">Other Services</option>
                 </select>
               </div>
 
-              {/* WhatsApp / Call Contact */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">WhatsApp / Phone *</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Mobile Money Number *</label>
                 <input
-                  type="text"
+                  type="tel"
                   required
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="+233 24 000 0000"
+                  placeholder="024XXXXXXX (For MoMo Prompt)"
                   className="w-full border rounded-lg p-2.5 text-sm"
                 />
               </div>
             </div>
 
-            {/* Image / Logo URL */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Shop Image or Logo URL</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Email for MoMo Receipt *</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your-email@gmail.com"
+                className="w-full border rounded-lg p-2.5 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Shop Photo URL (Optional)</label>
               <input
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://your-image-link.com/photo.jpg (Optional)"
+                placeholder="https://..."
                 className="w-full border rounded-lg p-2.5 text-sm"
               />
             </div>
 
-            {/* Payment Reference */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Reference / TxID</label>
-              <input
-                type="text"
-                value={paymentRef}
-                onChange={(e) => setPaymentRef(e.target.value)}
-                placeholder="e.g. MoMo Ref # 204918239"
-                className="w-full border rounded-lg p-2.5 text-sm"
-              />
-              <p className="text-[10px] text-gray-400 mt-1">
-                Pay GHS 20 via MoMo / Card to account or enter reference code above.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-lg text-sm transition"
+                className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-lg text-sm"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-2/3 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-md transition disabled:opacity-50 text-sm"
+                className="w-2/3 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow transition disabled:opacity-50 text-sm"
               >
-                {loading ? 'Publishing...' : `Pay ${currentPricing.symbol}${currentPricing.amount} & Publish`}
+                {loading ? 'Triggering MoMo...' : `Pay ${currentPricing.symbol}${currentPricing.amount} via MoMo`}
               </button>
             </div>
           </form>
@@ -226,10 +240,8 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
               ✓
             </div>
-            <h3 className="text-2xl font-bold text-gray-900">Ad Published Successfully!</h3>
-            <p className="text-sm text-gray-600">
-              Your shop promotion is now live on the Credible Artisans Auth Screen for 30 days!
-            </p>
+            <h3 className="text-2xl font-bold text-gray-900">Payment Authorized & Ad Published!</h3>
+            <p className="text-sm text-gray-600">Your shop promotion is now live on the Credible Artisans Auth Screen!</p>
             <button
               onClick={onClose}
               className="bg-gray-900 text-white font-semibold px-6 py-2.5 rounded-lg text-sm"
