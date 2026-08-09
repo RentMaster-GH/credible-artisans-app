@@ -5,11 +5,13 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Advertisement } from '@/types/advertisement';
 import { CreateAdModal } from '@/components/ads/CreateAdModal';
+import { DeleteAdModal } from '@/components/ads/DeleteAdModal';
 
 export const AdBanner: React.FC = () => {
   const [ads, setAds] = useState<Advertisement[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [adToDelete, setAdToDelete] = useState<Advertisement | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch active sponsor advertisements
@@ -49,13 +51,14 @@ export const AdBanner: React.FC = () => {
   return (
     <div className="w-full my-4">
       <div className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-5 text-white shadow-xl">
-        {/* Top Header Badge */}
+        
+        {/* Top Header Badge & Action Button */}
         <div className="flex justify-between items-center mb-3">
           <span className="bg-black/30 backdrop-blur-md text-amber-200 border border-amber-300/30 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full">
             ⭐ SPONSORED ARTISAN SHOP
           </span>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsCreateModalOpen(true)}
             className="bg-white text-gray-900 hover:bg-amber-100 font-bold text-xs px-3 py-1.5 rounded-lg shadow transition"
           >
             📢 Feature Your Shop (GH₵ 20)
@@ -79,15 +82,24 @@ export const AdBanner: React.FC = () => {
               <h4 className="text-lg font-extrabold leading-tight">{currentAd.shop_name}</h4>
               <p className="text-xs text-amber-100 line-clamp-2">{currentAd.headline}</p>
               
-              <div className="pt-2">
+              <div className="pt-2 flex items-center justify-center md:justify-start gap-3">
                 <a
-                  href={`https://wa.me/${currentAd.contact_phone.replace(/[^0-0]/g, '')}`}
+                  href={`https://wa.me/${currentAd.contact_phone.replace(/[^0-9]/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white font-bold text-xs px-3 py-1.5 rounded-md shadow"
                 >
-                  💬 Contact Shop on WhatsApp
+                  💬 WhatsApp Shop
                 </a>
+
+                {/* DIRECT DELETE BUTTON FOR ADVERTISERS */}
+                <button
+                  onClick={() => setAdToDelete(currentAd)}
+                  className="text-xs bg-black/20 hover:bg-black/40 text-red-200 hover:text-red-100 font-semibold px-2.5 py-1.5 rounded-md border border-white/20 transition"
+                  title="Remove this advertisement"
+                >
+                  🗑️ Delete Ad
+                </button>
               </div>
             </div>
           </div>
@@ -96,10 +108,10 @@ export const AdBanner: React.FC = () => {
           <div className="text-center py-4 space-y-2">
             <h4 className="text-base font-bold">Be the First Sponsored Artisan Shop Here!</h4>
             <p className="text-xs text-amber-100 max-w-md mx-auto">
-              Get thousands of direct client calls & WhatsApp orders by featuring your business on our sign-in page for just 20 GHS.
+              Get thousands of direct client calls & WhatsApp orders by featuring your business on our sign-in page for 20 GHS.
             </p>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => setIsCreateModalOpen(true)}
               className="mt-2 bg-white text-gray-900 hover:bg-amber-100 font-bold text-xs px-4 py-2 rounded-lg shadow"
             >
               🚀 Promote My Business Now (GH₵ 20)
@@ -122,12 +134,22 @@ export const AdBanner: React.FC = () => {
         )}
       </div>
 
-      {/* Self-Service Submission Modal */}
+      {/* 1. Self-Service Creation Modal */}
       <CreateAdModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchAds}
       />
+
+      {/* 2. Deletion Modal */}
+      {adToDelete && (
+        <DeleteAdModal
+          ad={adToDelete}
+          isOpen={!!adToDelete}
+          onClose={() => setAdToDelete(null)}
+          onSuccess={fetchAds}
+        />
+      )}
     </div>
   );
 };
