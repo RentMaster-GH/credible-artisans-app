@@ -1,72 +1,178 @@
-// components/ads/DeleteAdModal.tsx
+// AdBanner.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Advertisement } from '@/types/advertisement';
+import { CreateAdModal } from '@/components/ads/CreateAdModal';
+import { DeleteAdModal } from '@/components/ads/DeleteAdModal';
 
-interface Props {
-  ad: Advertisement;
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-}
+export const AdBanner: React.FC = () => {
+  const [ads, setAds] = useState<Advertisement[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [adToDelete, setAdToDelete] = useState<Advertisement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-export const DeleteAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess }) => {
-  const [loading, setLoading] = useState(false);
+  // Fetch logged in user ID to check ad ownership
+  useEffect(() => {
+    async function checkUser() {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    }
+    checkUser();
+  }, []);
 
-  if (!isOpen) return null;
+  // Fetch active sponsor advertisements
+  const fetchAds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('advertisements')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
 
-  const handleDelete = async () => {
-    setLoading(true);
-
-    const { error } = await supabase
-      .from('advertisements')
-      .delete()
-      .eq('id', ad.id);
-
-    setLoading(false);
-    if (!error) {
-      alert('Advertisement removed. Publishing a new ad will require a fresh 20 GHS fee (or foreign equivalent).');
-      onSuccess();
-      onClose();
-    } else {
-      alert(error.message);
+      if (!error && data) {
+        setAds(data as Advertisement[]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch sponsor ads:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchAds();
+  }, []);
+
+  // Auto-rotate advertisement banner every 5 seconds
+  useEffect(() => {
+    if (ads.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % ads.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [ads.length]);
+
+  // Instant Visual Off-Screen Removal Callback
+  const handleAdDeleted = (deletedAdId: string) => {
+    setAds((prevAds) => prevAds.filter((ad) => ad.id !== deletedAdId));
+    setAdToDelete(null);
+    setCurrentIndex(0); // Reset carousel to first item
+  };
+
+  const currentAd = ads[currentIndex];
+
   return (
-    <div onClick={onClose} className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl max-w-sm w-full p-6 relative text-center space-y-4">
-        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-          🗑️
-        </div>
-        <h3 className="text-lg font-bold text-gray-900">Delete Advertisement?</h3>
-        <p className="text-xs text-gray-600">
-          Are you sure you want to remove <strong>"{ad.shop_name}"</strong> from the auth screen?
-        </p>
-        <div className="bg-amber-50 p-3 rounded-lg text-amber-900 text-[11px] font-medium border border-amber-200">
-          ⚠️ Note: Once deleted, publishing another advertisement requires a new 20 GHS payment (or foreign currency equivalent).
+    <div className="w-full my-4">
+      <div className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-5 text-white shadow-xl">
+        
+        {/* Top Header Badge & Action Button */}
+        <div className="flex justify-between items-center mb-3">
+          <span className="bg-black/30 backdrop-blur-md text-amber-200 border border-amber-300/30 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full">
+            ⭐ SPONSORED ARTISAN SHOP
+          </span>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="bg-white text-gray-900 hover:bg-amber-100 font-bold text-xs px-3 py-1.5 rounded-lg shadow transition"
+          >
+            📢 Feature Your Shop (GH₵ 20)
+          </button>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold py-2.5 rounded-lg"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={loading}
-            className="w-1/2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-lg"
-          >
-            {loading ? 'Deleting...' : 'Delete Ad'}
-          </button>
-        </div>
+        {/* Dynamic Live Ad Content */}
+        {loading ? (
+          <div className="py-6 text-center text-xs opacity-80">Loading sponsor showcase...</div>
+        ) : ads.length > 0 && currentAd ? (
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <img
+              src={currentAd.image_url}
+              alt={currentAd.shop_name}
+              className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-xl border-2 border-white/50 shadow-md flex-shrink-0"
+            />
+            <div className="flex-1 text-center md:text-left space-y-1">
+              <span className="bg-white/20 text-xs px-2 py-0.5 rounded font-medium">
+                {currentAd.category}
+              </span>
+              <h4 className="text-lg font-extrabold leading-tight">{currentAd.shop_name}</h4>
+              <p className="text-xs text-amber-100 line-clamp-2">{currentAd.headline}</p>
+              
+              <div className="pt-2 flex items-center justify-center md:justify-start gap-3">
+                <a
+                  href={`https://wa.me/${currentAd.contact_phone.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white font-bold text-xs px-3 py-1.5 rounded-md shadow"
+                >
+                  💬 WhatsApp Shop
+                </a>
+
+                {/* CONVENIENT DELETE BUTTON - ONLY VISIBLE TO ADVERTISER WHO CREATED THIS AD */}
+                {currentUserId && currentAd.artisan_id === currentUserId && (
+                  <button
+                    onClick={() => setAdToDelete(currentAd)}
+                    className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1.5 rounded-md border border-red-400 shadow transition"
+                    title="Delete your advertisement"
+                  >
+                    🗑️ Delete My Advert
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Fallback when no paid ads exist yet */
+          <div className="text-center py-4 space-y-2">
+            <h4 className="text-base font-bold">Be the First Sponsored Artisan Shop Here!</h4>
+            <p className="text-xs text-amber-100 max-w-md mx-auto">
+              Get thousands of direct client calls & WhatsApp orders by featuring your business on our sign-in page for 20 GHS.
+            </p>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="mt-2 bg-white text-gray-900 hover:bg-amber-100 font-bold text-xs px-4 py-2 rounded-lg shadow"
+            >
+              🚀 Promote My Business Now (GH₵ 20)
+            </button>
+          </div>
+        )}
+
+        {/* Dots indicator for carousel */}
+        {ads.length > 1 && (
+          <div className="flex justify-center space-x-1.5 mt-3">
+            {ads.map((_, idx) => (
+              <span
+                key={idx}
+                className={`h-1.5 rounded-full transition-all ${
+                  idx === currentIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/40'
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* 1. Self-Service Creation Modal */}
+      <CreateAdModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={fetchAds}
+      />
+
+      {/* 2. Deletion Modal with Warning Prompt */}
+      {adToDelete && (
+        <DeleteAdModal
+          ad={adToDelete}
+          isOpen={!!adToDelete}
+          onClose={() => setAdToDelete(null)}
+          onSuccess={handleAdDeleted}
+        />
+      )}
     </div>
   );
 };
+
+export default AdBanner;
