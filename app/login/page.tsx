@@ -1,145 +1,279 @@
-'use client'
+// app/login/page.tsx
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import PasswordInput from '@/components/PasswordInput'
-import Navbar from '@/components/Navbar'
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { AdBanner } from '@/AdBanner'; // Adjust import path if AdBanner is in components/
+import { supabase } from '@/lib/supabaseClient';
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+export default function AuthPage() {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [role, setRole] = useState<'artisan' | 'client'>('client');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const router = useRouter()
-  const supabase = createClient()
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setErrorMsg(null)
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      setErrorMsg(error.message || 'Invalid email or password.')
-      setLoading(false)
-      return
+    try {
+      if (isSignUp) {
+        // Sign Up Flow
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              role: role,
+            },
+          },
+        });
+        if (signUpError) throw signUpError;
+        alert('Account created successfully! Please check your email to verify.');
+      } else {
+        // Sign In Flow
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
+        window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    if (data.user) {
-      window.location.href = '/dashboard'
-    }
-    setLoading(false)
-  }
-
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true)
-    setErrorMsg(null)
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-
-    if (error) {
-      setErrorMsg('Google login failed: ' + error.message)
-      setGoogleLoading(false)
-    }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
-      {/* Fixed: Use <Navbar /> without hideAuthButtons prop */}
-      <Navbar />
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-gray-900 text-white font-sans">
+      
+      {/* LEFT COLUMN: Visual Showcase & Artisan Gallery (7 Columns) */}
+      <div className="lg:col-span-7 relative hidden lg:flex flex-col justify-between p-12 bg-cover bg-center overflow-hidden">
+        {/* Background Overlay */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-10000 hover:scale-100"
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=1200')`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/60 backdrop-blur-[2px]" />
 
-      <div className="max-w-md mx-auto pt-16 px-4">
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-extrabold text-gray-900">Welcome Back</h1>
-            <p className="text-gray-500 text-xs mt-1">Sign in to your Credible Artisans account</p>
+        {/* Top Brand Logo */}
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center font-extrabold text-black text-xl shadow-lg">
+            CA
+          </div>
+          <span className="text-2xl font-black tracking-tight text-white">
+            Credible<span className="text-amber-400">Artisans</span>.com
+          </span>
+        </div>
+
+        {/* Center Headline & Artisan Cards Grid */}
+        <div className="relative z-10 my-auto space-y-6 max-w-xl">
+          <span className="bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">
+            Ghana's #1 Verified Artisan Platform
+          </span>
+          <h1 className="text-4xl lg:text-5xl font-black leading-tight text-white">
+            Connect with Skilled Artisans or Grow Your Workshop.
+          </h1>
+          <p className="text-gray-300 text-sm leading-relaxed">
+            Generate professional Bill of Quantities (BOQ), video call clients live on screen, and showcase your craftsmanship to thousands of homeowners.
+          </p>
+
+          {/* Photo Showcase Grid */}
+          <div className="grid grid-cols-3 gap-3 pt-4">
+            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-28 shadow-lg">
+              <img 
+                src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=400" 
+                alt="Welder" 
+                className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+              />
+              <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-[10px] font-bold px-2 py-0.5 rounded text-amber-300">
+                Fabrication
+              </span>
+            </div>
+            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-28 shadow-lg">
+              <img 
+                src="https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=400" 
+                alt="Plumbing" 
+                className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+              />
+              <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-[10px] font-bold px-2 py-0.5 rounded text-amber-300">
+                Plumbing
+              </span>
+            </div>
+            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-28 shadow-lg">
+              <img 
+                src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=400" 
+                alt="Electrical" 
+                className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+              />
+              <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-[10px] font-bold px-2 py-0.5 rounded text-amber-300">
+                Electrical
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Floating Stats */}
+        <div className="relative z-10 flex items-center gap-8 border-t border-white/10 pt-6">
+          <div>
+            <p className="text-2xl font-black text-amber-400">2,500+</p>
+            <p className="text-xs text-gray-400 font-medium">Verified Artisans</p>
+          </div>
+          <div className="w-px h-8 bg-white/20" />
+          <div>
+            <p className="text-2xl font-black text-amber-400">100%</p>
+            <p className="text-xs text-gray-400 font-medium">In-App Live Video & BOQ</p>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN: Auth Form & Self-Service Sponsor Portal (5 Columns) */}
+      <div className="lg:col-span-5 bg-white text-gray-900 flex flex-col justify-between p-6 sm:p-10 overflow-y-auto">
+        
+        {/* Top Toggle Header */}
+        <div className="flex justify-between items-center mb-6">
+          <Link href="/" className="lg:hidden flex items-center gap-2">
+            <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-black text-sm">
+              CA
+            </div>
+            <span className="font-bold text-lg">CredibleArtisans</span>
+          </Link>
+
+          <div className="text-sm font-medium ml-auto">
+            {isSignUp ? 'Already registered?' : "Don't have an account?"}{' '}
+            <button
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError('');
+              }}
+              className="text-amber-600 hover:text-amber-700 font-bold underline ml-1"
+            >
+              {isSignUp ? 'Sign In' : 'Register Now'}
+            </button>
+          </div>
+        </div>
+
+        {/* Main Auth Form Container */}
+        <div className="max-w-md w-full mx-auto space-y-6 my-auto">
+          
+          <div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+              {isSignUp ? 'Create Your Account' : 'Welcome Back'}
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              {isSignUp
+                ? 'Join CredibleArtisans as an Artisan or Client'
+                : 'Sign in to access your portal, chats, and BOQs'}
+            </p>
           </div>
 
-          {errorMsg && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
-              {errorMsg}
+          {/* Self-Service 20 GHS Sponsor Ad Banner */}
+          <AdBanner />
+
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs font-medium border border-red-200">
+              {error}
             </div>
           )}
 
-          {/* Google Sign-In Button */}
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={googleLoading}
-            className="w-full mb-6 flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-sm py-2.5 rounded-xl transition shadow-sm"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-            </svg>
-            {googleLoading ? 'Connecting to Google...' : 'Sign in with Google'}
-          </button>
+          <form onSubmit={handleAuth} className="space-y-4">
+            
+            {/* Account Role Selector */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setRole('client')}
+                className={`py-2 text-xs font-bold rounded-lg transition ${
+                  role === 'client'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                👤 I am a Client
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('artisan')}
+                className={`py-2 text-xs font-bold rounded-lg transition ${
+                  role === 'artisan'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                🛠️ I am an Artisan
+              </button>
+            </div>
 
-          <div className="relative flex py-2 items-center mb-6">
-            <div className="flex-grow border-t border-gray-200"></div>
-            <span className="flex-shrink mx-4 text-gray-400 text-xs font-semibold uppercase">Or Email</span>
-            <div className="flex-grow border-t border-gray-200"></div>
-          </div>
+            {/* Name Input (Sign Up Only) */}
+            {isSignUp && (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Kwame Mensah"
+                  className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+            )}
 
-          <form onSubmit={handleEmailLogin} className="space-y-4">
+            {/* Email Input */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Email Address *</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="name@example.com"
+                className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
             </div>
 
+            {/* Password Input */}
             <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-medium text-gray-700">Password</label>
-                <Link href="/forgot-password" className="text-xs text-indigo-600 hover:underline font-semibold">
-                  Forgot password?
-                </Link>
-              </div>
-              <PasswordInput
+              <label className="block text-xs font-bold text-gray-700 mb-1">Password *</label>
+              <input
+                type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                label=""
+                placeholder="••••••••"
+                className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 rounded-xl shadow-lg shadow-amber-500/30 transition disabled:opacity-50 text-sm"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading
+                ? 'Processing...'
+                : isSignUp
+                ? `Register as ${role === 'artisan' ? 'Artisan' : 'Client'}`
+                : 'Sign In to Portal'}
             </button>
           </form>
+        </div>
 
-          <div className="mt-6 text-center text-xs text-gray-500">
-            Don't have an account yet?{' '}
-            <Link href="/signup" className="text-indigo-600 font-bold hover:underline">
-              Create an Account
-            </Link>
-          </div>
+        {/* Bottom Footer */}
+        <div className="text-center text-xs text-gray-400 mt-6 pt-4 border-t">
+          © {new Date().getFullYear()} CredibleArtisans.com. All rights reserved.
         </div>
       </div>
+
     </div>
-  )
+  );
 }
