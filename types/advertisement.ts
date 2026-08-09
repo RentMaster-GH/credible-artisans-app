@@ -32,7 +32,6 @@ export interface CreateAdInput {
   payment_reference?: string;
 }
 
-// Preset Pricing Map: 20 GHS or foreign equivalents
 export const AD_PRICING: Record<AdCurrency, { amount: number; symbol: string; label: string }> = {
   GHS: { amount: 20, symbol: 'GH₵', label: 'GH₵ 20 (Ghana Cedi)' },
   USD: { amount: 1.50, symbol: '$', label: '$1.50 USD (US Dollar)' },

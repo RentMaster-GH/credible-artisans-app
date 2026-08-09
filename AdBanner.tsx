@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Advertisement } from '@/types/advertisement';
+import type { Advertisement } from '@/types/advertisement';
 import { CreateAdModal } from '@/components/ads/CreateAdModal';
 import { DeleteAdModal } from '@/components/ads/DeleteAdModal';
 
@@ -15,7 +15,6 @@ export const AdBanner: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Fetch logged in user to verify ownership of ads
   useEffect(() => {
     async function checkUser() {
       const { data } = await supabase.auth.getUser();
@@ -26,7 +25,6 @@ export const AdBanner: React.FC = () => {
     checkUser();
   }, []);
 
-  // Fetch active sponsor advertisements
   const fetchAds = async () => {
     try {
       const { data, error } = await supabase
@@ -49,7 +47,6 @@ export const AdBanner: React.FC = () => {
     fetchAds();
   }, []);
 
-  // Auto-rotate advertisement banner every 5 seconds
   useEffect(() => {
     if (ads.length <= 1) return;
     const interval = setInterval(() => {
@@ -58,14 +55,10 @@ export const AdBanner: React.FC = () => {
     return () => clearInterval(interval);
   }, [ads.length]);
 
-  // Handle Instant Visual Removal on Delete
-  const handleAdDeleted = () => {
-    if (adToDelete) {
-      setAds((prevAds) => prevAds.filter((ad) => ad.id !== adToDelete.id));
-      setAdToDelete(null);
-      setCurrentIndex(0); // Reset carousel to first item
-    }
-    fetchAds(); // Refresh from DB
+  const handleAdDeleted = (deletedAdId: string) => {
+    setAds((prevAds) => prevAds.filter((ad) => ad.id !== deletedAdId));
+    setAdToDelete(null);
+    setCurrentIndex(0);
   };
 
   const currentAd = ads[currentIndex];
@@ -74,7 +67,6 @@ export const AdBanner: React.FC = () => {
     <div className="w-full my-4">
       <div className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-5 text-white shadow-xl">
         
-        {/* Top Header Badge & Action Button */}
         <div className="flex justify-between items-center mb-3">
           <span className="bg-black/30 backdrop-blur-md text-amber-200 border border-amber-300/30 text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full">
             ⭐ SPONSORED ARTISAN SHOP
@@ -87,7 +79,6 @@ export const AdBanner: React.FC = () => {
           </button>
         </div>
 
-        {/* Dynamic Live Ad Content */}
         {loading ? (
           <div className="py-6 text-center text-xs opacity-80">Loading sponsor showcase...</div>
         ) : ads.length > 0 && currentAd ? (
@@ -114,21 +105,19 @@ export const AdBanner: React.FC = () => {
                   💬 WhatsApp Shop
                 </a>
 
-                {/* DELETE BUTTON ONLY VISIBLE TO THE OWNER OF THIS AD */}
                 {currentUserId && currentAd.artisan_id === currentUserId && (
                   <button
                     onClick={() => setAdToDelete(currentAd)}
                     className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1.5 rounded-md border border-red-400 shadow transition"
                     title="Delete your advertisement"
                   >
-                    🗑️ Delete My Ad
+                    🗑️ Delete My Advert
                   </button>
                 )}
               </div>
             </div>
           </div>
         ) : (
-          /* Fallback when no paid ads exist yet */
           <div className="text-center py-4 space-y-2">
             <h4 className="text-base font-bold">Be the First Sponsored Artisan Shop Here!</h4>
             <p className="text-xs text-amber-100 max-w-md mx-auto">
@@ -143,7 +132,6 @@ export const AdBanner: React.FC = () => {
           </div>
         )}
 
-        {/* Dots indicator for carousel */}
         {ads.length > 1 && (
           <div className="flex justify-center space-x-1.5 mt-3">
             {ads.map((_, idx) => (
@@ -158,14 +146,12 @@ export const AdBanner: React.FC = () => {
         )}
       </div>
 
-      {/* 1. Self-Service Creation Modal */}
       <CreateAdModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchAds}
       />
 
-      {/* 2. Deletion Modal */}
       {adToDelete && (
         <DeleteAdModal
           ad={adToDelete}
