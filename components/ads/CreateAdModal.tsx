@@ -41,11 +41,11 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
         headline,
         category,
         contact_phone: contactPhone,
-        image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400', // Fallback default image
+        image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
         amount_paid: currentPricing.amount,
         currency,
         payment_reference: paymentRef || 'DIRECT_AUTH_PROMO',
-        status: 'active', // Instantly active
+        status: 'active',
       });
 
       if (insertError) throw insertError;
@@ -60,23 +60,33 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border relative my-8">
-        {/* Close Button */}
+    /* Dark Backdrop - Clicking outside closes the modal */
+    <div 
+      onClick={onClose} 
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto"
+    >
+      {/* Modal Box - Stops propagation so clicking inside does not close */}
+      <div 
+        onClick={(e) => e.stopPropagation()} 
+        className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border relative my-8 border-gray-100"
+      >
+        {/* Highly Visible Prominent Close (X) Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg"
+          aria-label="Close modal"
+          className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-black font-extrabold text-lg transition shadow-sm z-30 cursor-pointer"
         >
           ✕
         </button>
 
         {!submitted ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div>
               <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
                 Self-Service Promo
               </span>
-              <h2 className="text-xl font-bold text-gray-900 mt-2">
+              <h2 className="text-xl font-bold text-gray-900 mt-2 pr-8">
                 📢 Advertise Your Shop Here
               </h2>
               <p className="text-xs text-gray-500">
@@ -109,38 +119,38 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
 
             {/* Shop Name */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700">Shop / Business Name *</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Shop / Business Name *</label>
               <input
                 type="text"
                 required
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
                 placeholder="e.g. Kwame Furniture & Fittings"
-                className="mt-1 w-full border rounded-lg p-2.5 text-sm"
+                className="w-full border rounded-lg p-2.5 text-sm"
               />
             </div>
 
             {/* Headline / Offer */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700">Headline / Promotional Offer *</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Headline / Promotional Offer *</label>
               <input
                 type="text"
                 required
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
                 placeholder="e.g. Quality Custom Wardrobes & Kitchen Cabinets in Accra"
-                className="mt-1 w-full border rounded-lg p-2.5 text-sm"
+                className="w-full border rounded-lg p-2.5 text-sm"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               {/* Category */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700">Category *</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Category *</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="mt-1 w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border rounded-lg p-2.5 text-sm"
                 >
                   <option value="Carpentry">Carpentry & Furniture</option>
                   <option value="Plumbing">Plumbing</option>
@@ -154,52 +164,62 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
 
               {/* WhatsApp / Call Contact */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700">WhatsApp / Phone *</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">WhatsApp / Phone *</label>
                 <input
                   type="text"
                   required
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
                   placeholder="+233 24 000 0000"
-                  className="mt-1 w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border rounded-lg p-2.5 text-sm"
                 />
               </div>
             </div>
 
             {/* Image / Logo URL */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700">Shop Image or Logo URL</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Shop Image or Logo URL</label>
               <input
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://your-image-link.com/photo.jpg (Optional)"
-                className="mt-1 w-full border rounded-lg p-2.5 text-sm"
+                className="w-full border rounded-lg p-2.5 text-sm"
               />
             </div>
 
             {/* Payment Reference */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700">Payment Reference / Mobile Money TxID</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Payment Reference / TxID</label>
               <input
                 type="text"
                 value={paymentRef}
                 onChange={(e) => setPaymentRef(e.target.value)}
                 placeholder="e.g. MoMo Ref # 204918239"
-                className="mt-1 w-full border rounded-lg p-2.5 text-sm"
+                className="w-full border rounded-lg p-2.5 text-sm"
               />
               <p className="text-[10px] text-gray-400 mt-1">
                 Pay GHS 20 via MoMo / Card to account or enter reference code above.
               </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-md transition disabled:opacity-50"
-            >
-              {loading ? 'Publishing Sponsor Ad...' : `Pay ${currentPricing.symbol}${currentPricing.amount} & Publish Ad`}
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-lg text-sm transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-2/3 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-md transition disabled:opacity-50 text-sm"
+              >
+                {loading ? 'Publishing...' : `Pay ${currentPricing.symbol}${currentPricing.amount} & Publish`}
+              </button>
+            </div>
           </form>
         ) : (
           <div className="text-center py-8 space-y-4">
