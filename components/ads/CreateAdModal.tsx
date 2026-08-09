@@ -27,7 +27,14 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
 
   const currentPricing = AD_PRICING[currency];
 
-  // Load Paystack Inline JS for Mobile Money Prompt
+  const resetForm = () => {
+    setShopName('');
+    setHeadline('');
+    setImageUrl('');
+    setError('');
+    setSubmitted(false);
+  };
+
   const loadPaystackScript = () => {
     return new Promise((resolve) => {
       if ((window as any).PaystackPop) {
@@ -50,14 +57,12 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
       await loadPaystackScript();
       const { data: userData } = await supabase.auth.getUser();
 
-      // Paystack Key (Uses Public Key or Fallback Test)
       const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
 
-      // Trigger Paystack Mobile Money Pop-up / Prompt
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
         email: email || userData?.user?.email || 'advertiser@credibleartisans.com',
-        amount: currentPricing.amount * 100, // Amount in lowest subunit (pesewas/cents)
+        amount: currentPricing.amount * 100,
         currency: currency,
         ref: 'AD_' + Math.floor(Math.random() * 1000000000 + 1),
         onClose: () => {
@@ -65,7 +70,6 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
           setError('Payment popup closed. Ad was not published.');
         },
         callback: async (response: any) => {
-          // Payment Successful -> Save Ad to Database
           const { error: insertError } = await supabase.from('advertisements').insert({
             artisan_id: userData?.user?.id || null,
             shop_name: shopName,
@@ -189,7 +193,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
                   required
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="024XXXXXXX (For MoMo Prompt)"
+                  placeholder="024XXXXXXX"
                   className="w-full border rounded-lg p-2.5 text-sm"
                 />
               </div>
@@ -236,18 +240,30 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
             </div>
           </form>
         ) : (
-          <div className="text-center py-8 space-y-4">
+          /* SUCCESS SCREEN with "Advertise Another Product" option */
+          <div className="text-center py-6 space-y-4">
             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
               ✓
             </div>
-            <h3 className="text-2xl font-bold text-gray-900">Payment Authorized & Ad Published!</h3>
-            <p className="text-sm text-gray-600">Your shop promotion is now live on the Credible Artisans Auth Screen!</p>
-            <button
-              onClick={onClose}
-              className="bg-gray-900 text-white font-semibold px-6 py-2.5 rounded-lg text-sm"
-            >
-              Close & View Live Ad
-            </button>
+            <h3 className="text-2xl font-bold text-gray-900">Ad Published Successfully!</h3>
+            <p className="text-sm text-gray-600">Your product promotion is now live on the Credible Artisans Auth Screen!</p>
+            
+            <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-lg text-xs shadow"
+              >
+                📢 Promote Another Product ({currentPricing.symbol}{currentPricing.amount})
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-gray-900 hover:bg-black text-white font-semibold px-4 py-2.5 rounded-lg text-xs"
+              >
+                Close & View Live Ad
+              </button>
+            </div>
           </div>
         )}
       </div>
