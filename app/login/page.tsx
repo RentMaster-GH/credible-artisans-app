@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
+import { VerificationModal } from '@/components/auth/VerificationModal';
 
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -17,6 +18,14 @@ export default function AuthPage() {
   // Show / Hide Password state toggles
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Verification Gate State
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+  const [activeUserId, setActiveUserId] = useState('');
+
+  // Artisans Near Me Search State
+  const [searchCity, setSearchCity] = useState('');
+  const [searchService, setSearchService] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +52,7 @@ export default function AuthPage() {
     try {
       if (isSignUp) {
         // Sign Up Flow
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -54,7 +63,14 @@ export default function AuthPage() {
           },
         });
         if (signUpError) throw signUpError;
-        alert('Account created successfully! Please check your email to verify.');
+        
+        // Open Verification Modal for newly signed up user
+        if (authData.user) {
+          setActiveUserId(authData.user.id);
+          setIsVerificationOpen(true);
+        } else {
+          alert('Account created successfully! Please check your email to verify.');
+        }
       } else {
         // Sign In Flow
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -68,6 +84,17 @@ export default function AuthPage() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleContactArtisanClick = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setIsSignUp(true);
+      setError('Please sign up or sign in first to contact artisans near you.');
+    } else {
+      setActiveUserId(user.id);
+      setIsVerificationOpen(true);
     }
   };
 
@@ -106,8 +133,46 @@ export default function AuthPage() {
             Generate professional Bill of Quantities (BOQ), video call clients live on screen, and showcase your craftsmanship to thousands of homeowners.
           </p>
 
+          {/* "📍 Artisans Near Me" Search Discovery Bar */}
+          <div className="bg-gray-800/90 p-4 rounded-xl border border-gray-700/80 space-y-3 backdrop-blur-md shadow-xl">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
+                📍 Artisans Near Me
+              </span>
+              <span className="text-[10px] text-gray-400">Sign Up & Verify ID to Connect</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={searchCity}
+                onChange={(e) => setSearchCity(e.target.value)}
+                placeholder="City (e.g. Accra, Kumasi)"
+                className="bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+              />
+              <select 
+                value={searchService}
+                onChange={(e) => setSearchService(e.target.value)}
+                className="bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+              >
+                <option value="">All Services</option>
+                <option value="Carpentry">Carpentry</option>
+                <option value="Plumbing">Plumbing</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Welding">Welding</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleContactArtisanClick}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs py-2.5 rounded-lg transition"
+            >
+              🔍 Find & Contact Verified Artisans Near Me
+            </button>
+          </div>
+
           {/* Photo Showcase Grid */}
-          <div className="grid grid-cols-3 gap-3 pt-4">
+          <div className="grid grid-cols-3 gap-3 pt-2">
             <div className="relative group overflow-hidden rounded-xl border border-white/20 h-28 shadow-lg">
               <img 
                 src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=400" 
@@ -327,6 +392,16 @@ export default function AuthPage() {
           © {new Date().getFullYear()} CredibleArtisans.com. All rights reserved.
         </div>
       </div>
+
+      {/* Verification Modal Gate */}
+      <VerificationModal
+        isOpen={isVerificationOpen}
+        userId={activeUserId}
+        onClose={() => setIsVerificationOpen(false)}
+        onSuccess={() => {
+          window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
+        }}
+      />
 
     </div>
   );

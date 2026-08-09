@@ -12,6 +12,7 @@ interface Props {
 }
 
 export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
+  // Form State
   const [shopName, setShopName] = useState('');
   const [headline, setHeadline] = useState('');
   const [category, setCategory] = useState('Carpentry');
@@ -19,6 +20,12 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
   const [email, setEmail] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [currency, setCurrency] = useState<AdCurrency>('GHS');
+
+  // Mandatory ID Verification State
+  const [idType, setIdType] = useState('ghana_card');
+  const [idNumber, setIdNumber] = useState('');
+  const [idDocumentUrl, setIdDocumentUrl] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -31,6 +38,8 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     setShopName('');
     setHeadline('');
     setImageUrl('');
+    setIdNumber('');
+    setIdDocumentUrl('');
     setError('');
     setSubmitted(false);
   };
@@ -64,6 +73,9 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
         amount_paid: currentPricing.amount,
         currency,
         payment_reference: paymentRef,
+        id_type: idType,
+        id_number: idNumber,
+        id_document_url: idDocumentUrl,
         status: 'active',
       });
 
@@ -85,6 +97,12 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     setLoading(true);
     setError('');
 
+    if (!idNumber || !idDocumentUrl) {
+      setError('National ID Number and Document URL are required for verification.');
+      setLoading(false);
+      return;
+    }
+
     const scriptLoaded = await loadPaystackScript();
     if (!scriptLoaded) {
       setError('Could not connect to payment gateway. Please check internet connection.');
@@ -97,7 +115,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
       const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
       const referenceCode = 'AD_' + Math.floor(Math.random() * 1000000000 + 1);
 
-      // Attach explicit global functions on window object to bypass SWC minification
+      // Explicit global window callback handlers
       (window as any).onPaystackSuccess = function (response: any) {
         const ref = response?.reference || response?.trxref || referenceCode;
         saveAdvertisement(ref);
@@ -108,11 +126,10 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
         setError('Payment popup closed. Ad was not published.');
       };
 
-      // Pass global function references to Paystack Setup
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
         email: email || userData?.user?.email || 'advertiser@credibleartisans.com',
-        amount: currentPricing.amount * 100, // Amount in pesewas
+        amount: currentPricing.amount * 100, // Amount in pesewas / cents
         currency: currency,
         ref: referenceCode,
         callback: (window as any).onPaystackSuccess,
@@ -163,7 +180,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value as AdCurrency)}
-                className="text-xs font-semibold border rounded p-1.5 bg-white"
+                className="text-xs font-semibold border rounded p-1.5 bg-white text-gray-800"
               >
                 {Object.entries(AD_PRICING).map(([key, val]) => (
                   <option key={key} value={key}>{val.label}</option>
@@ -246,6 +263,51 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
                 placeholder="https://..."
                 className="w-full border rounded-lg p-2.5 text-sm"
               />
+            </div>
+
+            {/* Mandatory Advertiser Verification Section */}
+            <div className="border-t pt-3 space-y-3 bg-gray-50 p-3 rounded-lg">
+              <p className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                🛡️ Mandatory Advertiser Verification
+              </p>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-700">ID Type *</label>
+                  <select
+                    value={idType}
+                    onChange={(e) => setIdType(e.target.value)}
+                    className="w-full border rounded p-2 text-xs bg-white"
+                  >
+                    <option value="ghana_card">Ghana Card</option>
+                    <option value="passport">Passport</option>
+                    <option value="drivers_license">Driver's License</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-700">ID Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={idNumber}
+                    onChange={(e) => setIdNumber(e.target.value)}
+                    placeholder="GHA-000000000-0"
+                    className="w-full border rounded p-2 text-xs bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-700">ID Document Photo URL *</label>
+                <input
+                  type="url"
+                  required
+                  value={idDocumentUrl}
+                  onChange={(e) => setIdDocumentUrl(e.target.value)}
+                  placeholder="https://your-image-link.com/id.jpg"
+                  className="w-full border rounded p-2 text-xs bg-white"
+                />
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">
