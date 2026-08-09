@@ -7,6 +7,27 @@ import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 import { VerificationModal } from '@/components/auth/VerificationModal';
 
+// Major World Cities List
+const GLOBAL_CITIES = [
+  'Accra, Ghana',
+  'Kumasi, Ghana',
+  'Lagos, Nigeria',
+  'London, United Kingdom',
+  'New York, USA',
+  'Toronto, Canada',
+  'Dubai, UAE',
+  'Johannesburg, South Africa',
+  'Berlin, Germany',
+  'Sydney, Australia',
+];
+
+// Sample Nearby Artisans Preview
+const SAMPLE_ARTISANS = [
+  { id: '1', name: 'Kwame M.', service: 'Carpentry & Cabinets', location: 'Accra, Ghana' },
+  { id: '2', name: 'David R.', service: 'Master Electrician', location: 'London, UK' },
+  { id: '3', name: 'Sarah B.', service: 'Plumbing Specialist', location: 'Toronto, Canada' },
+];
+
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState<'artisan' | 'client'>('client');
@@ -23,7 +44,7 @@ export default function AuthPage() {
   const [isVerificationOpen, setIsVerificationOpen] = useState(false);
   const [activeUserId, setActiveUserId] = useState('');
 
-  // Artisans Near Me Search State
+  // Artisans Near Me Filter State
   const [searchCity, setSearchCity] = useState('');
   const [searchService, setSearchService] = useState('');
 
@@ -64,12 +85,12 @@ export default function AuthPage() {
         });
         if (signUpError) throw signUpError;
         
-        // Open Verification Modal for newly signed up user
+        // Open Mandatory ID Verification Modal upon signup
         if (authData.user) {
           setActiveUserId(authData.user.id);
           setIsVerificationOpen(true);
         } else {
-          alert('Account created successfully! Please check your email to verify.');
+          alert('Account created! Please check your email to verify.');
         }
       } else {
         // Sign In Flow
@@ -87,11 +108,13 @@ export default function AuthPage() {
     }
   };
 
-  const handleContactArtisanClick = async () => {
+  // Contact Artisan Trigger (Forces Sign Up & ID Verification)
+  const handleContactArtisanClick = async (artisan: typeof SAMPLE_ARTISANS[0]) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setIsSignUp(true);
-      setError('Please sign up or sign in first to contact artisans near you.');
+      setError(`Please sign up and complete ID verification to contact ${artisan.name}.`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setActiveUserId(user.id);
       setIsVerificationOpen(true);
@@ -101,7 +124,7 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-gray-900 text-white font-sans">
       
-      {/* LEFT COLUMN: Visual Showcase & Artisan Gallery (7 Columns) */}
+      {/* LEFT COLUMN: Global Visual Showcase & Artisan Near Me Discovery */}
       <div className="lg:col-span-7 relative hidden lg:flex flex-col justify-between p-12 bg-cover bg-center overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-10000 hover:scale-100"
@@ -121,59 +144,76 @@ export default function AuthPage() {
           </span>
         </div>
 
-        {/* Center Headline & Artisan Cards Grid */}
+        {/* Center Headline & Global Near Me Discovery */}
         <div className="relative z-10 my-auto space-y-6 max-w-xl">
           <span className="bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">
-            Ghana's #1 Verified Artisan Platform
+            THE GLOBAL NETWORK FOR VERIFIED ARTISANS
           </span>
           <h1 className="text-4xl lg:text-5xl font-black leading-tight text-white">
-            Connect with Skilled Artisans or Grow Your Workshop.
+            Connect with Skilled Artisans Worldwide.
           </h1>
           <p className="text-gray-300 text-sm leading-relaxed">
-            Generate professional Bill of Quantities (BOQ), video call clients live on screen, and showcase your craftsmanship to thousands of homeowners.
+            Generate professional Bill of Quantities (BOQ), video call clients live on screen, and showcase your craftsmanship to clients globally.
           </p>
 
-          {/* "📍 Artisans Near Me" Search Discovery Bar */}
+          {/* GLOBAL "📍 Artisans Near Me" Discovery Box */}
           <div className="bg-gray-800/90 p-4 rounded-xl border border-gray-700/80 space-y-3 backdrop-blur-md shadow-xl">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                📍 Artisans Near Me
+                📍 Discover Artisans Near Me (Global)
               </span>
-              <span className="text-[10px] text-gray-400">Sign Up & Verify ID to Connect</span>
+              <span className="text-[10px] text-gray-400">Sign Up Required to Contact</span>
             </div>
 
+            {/* Worldwide City & Service Dropdowns */}
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
+              <select
                 value={searchCity}
                 onChange={(e) => setSearchCity(e.target.value)}
-                placeholder="City (e.g. Accra, Kumasi)"
-                className="bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
-              />
-              <select 
+                className="bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+              >
+                <option value="">Select City (Worldwide)</option>
+                {GLOBAL_CITIES.map((city) => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
+
+              <select
                 value={searchService}
                 onChange={(e) => setSearchService(e.target.value)}
                 className="bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
               >
                 <option value="">All Services</option>
-                <option value="Carpentry">Carpentry</option>
+                <option value="Carpentry">Carpentry & Furniture</option>
                 <option value="Plumbing">Plumbing</option>
                 <option value="Electrical">Electrical</option>
-                <option value="Welding">Welding</option>
+                <option value="Welding">Welding & Fabrication</option>
+                <option value="Masonry">Masonry & Construction</option>
               </select>
             </div>
 
-            <button
-              onClick={handleContactArtisanClick}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs py-2.5 rounded-lg transition"
-            >
-              🔍 Find & Contact Verified Artisans Near Me
-            </button>
+            {/* Sample Nearby Artisans with Strict Sign Up Gate */}
+            <div className="space-y-2 pt-1">
+              {SAMPLE_ARTISANS.map((artisan) => (
+                <div key={artisan.id} className="flex justify-between items-center bg-gray-900/80 p-2.5 rounded-lg border border-gray-700/50">
+                  <div>
+                    <p className="text-xs font-bold text-white">{artisan.name} <span className="text-[10px] text-amber-400">({artisan.service})</span></p>
+                    <p className="text-[10px] text-gray-400">📍 {artisan.location}</p>
+                  </div>
+                  <button
+                    onClick={() => handleContactArtisanClick(artisan)}
+                    className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-[11px] px-3 py-1.5 rounded transition shadow"
+                  >
+                    💬 Contact
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Photo Showcase Grid */}
           <div className="grid grid-cols-3 gap-3 pt-2">
-            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-28 shadow-lg">
+            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-24 shadow-lg">
               <img 
                 src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=400" 
                 alt="Welder" 
@@ -183,7 +223,7 @@ export default function AuthPage() {
                 Fabrication
               </span>
             </div>
-            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-28 shadow-lg">
+            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-24 shadow-lg">
               <img 
                 src="https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=400" 
                 alt="Plumbing" 
@@ -193,7 +233,7 @@ export default function AuthPage() {
                 Plumbing
               </span>
             </div>
-            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-28 shadow-lg">
+            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-24 shadow-lg">
               <img 
                 src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=400" 
                 alt="Electrical" 
@@ -209,8 +249,8 @@ export default function AuthPage() {
         {/* Bottom Floating Stats */}
         <div className="relative z-10 flex items-center gap-8 border-t border-white/10 pt-6">
           <div>
-            <p className="text-2xl font-black text-amber-400">2,500+</p>
-            <p className="text-xs text-gray-400 font-medium">Verified Artisans</p>
+            <p className="text-2xl font-black text-amber-400">Global</p>
+            <p className="text-xs text-gray-400 font-medium">Verified Artisan Network</p>
           </div>
           <div className="w-px h-8 bg-white/20" />
           <div>
@@ -220,7 +260,7 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Auth Form & Self-Service Sponsor Portal (5 Columns) */}
+      {/* RIGHT COLUMN: Auth Form & Self-Service Sponsor Portal */}
       <div className="lg:col-span-5 bg-white text-gray-900 flex flex-col justify-between p-6 sm:p-10 overflow-y-auto">
         
         {/* Top Toggle Header */}
@@ -264,7 +304,7 @@ export default function AuthPage() {
           <AdBanner />
 
           {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs font-medium border border-red-200">
+            <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-xs font-semibold border border-amber-300">
               {error}
             </div>
           )}
@@ -393,7 +433,7 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Verification Modal Gate */}
+      {/* Verification Gate Modal */}
       <VerificationModal
         isOpen={isVerificationOpen}
         userId={activeUserId}
