@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { AdBanner } from '@/AdBanner'; // Adjust import path if AdBanner is in components/
+import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 
 export default function AuthPage() {
@@ -11,7 +11,13 @@ export default function AuthPage() {
   const [role, setRole] = useState<'artisan' | 'client'>('client');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  
+  // Show / Hide Password state toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,6 +25,20 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // Password Match Check for Sign Up
+    if (isSignUp) {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match. Please verify your password.');
+        setLoading(false);
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters long.');
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
       if (isSignUp) {
@@ -56,7 +76,6 @@ export default function AuthPage() {
       
       {/* LEFT COLUMN: Visual Showcase & Artisan Gallery (7 Columns) */}
       <div className="lg:col-span-7 relative hidden lg:flex flex-col justify-between p-12 bg-cover bg-center overflow-hidden">
-        {/* Background Overlay */}
         <div 
           className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-10000 hover:scale-100"
           style={{
@@ -241,18 +260,53 @@ export default function AuthPage() {
               />
             </div>
 
-            {/* Password Input */}
+            {/* Password Input with 👁️ Eye Toggle */}
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Password *</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full border border-gray-300 rounded-xl p-3 text-sm pr-10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-base focus:outline-none p-1"
+                  title={showPassword ? 'Hide Password' : 'Show Password'}
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
             </div>
+
+            {/* Confirm Password Input (Sign Up Only) with 👁️ Eye Toggle */}
+            {isSignUp && (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Confirm Password *</label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full border border-gray-300 rounded-xl p-3 text-sm pr-10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-base focus:outline-none p-1"
+                    title={showConfirmPassword ? 'Hide Password' : 'Show Password'}
+                  >
+                    {showConfirmPassword ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
