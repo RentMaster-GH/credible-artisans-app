@@ -13,6 +13,18 @@ export const AdBanner: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [adToDelete, setAdToDelete] = useState<Advertisement | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Fetch logged in user to verify ownership of ads
+  useEffect(() => {
+    async function checkUser() {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    }
+    checkUser();
+  }, []);
 
   // Fetch active sponsor advertisements
   const fetchAds = async () => {
@@ -45,6 +57,16 @@ export const AdBanner: React.FC = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [ads.length]);
+
+  // Handle Instant Visual Removal on Delete
+  const handleAdDeleted = () => {
+    if (adToDelete) {
+      setAds((prevAds) => prevAds.filter((ad) => ad.id !== adToDelete.id));
+      setAdToDelete(null);
+      setCurrentIndex(0); // Reset carousel to first item
+    }
+    fetchAds(); // Refresh from DB
+  };
 
   const currentAd = ads[currentIndex];
 
@@ -92,14 +114,16 @@ export const AdBanner: React.FC = () => {
                   💬 WhatsApp Shop
                 </a>
 
-                {/* DIRECT DELETE BUTTON FOR ADVERTISERS */}
-                <button
-                  onClick={() => setAdToDelete(currentAd)}
-                  className="text-xs bg-black/20 hover:bg-black/40 text-red-200 hover:text-red-100 font-semibold px-2.5 py-1.5 rounded-md border border-white/20 transition"
-                  title="Remove this advertisement"
-                >
-                  🗑️ Delete Ad
-                </button>
+                {/* DELETE BUTTON ONLY VISIBLE TO THE OWNER OF THIS AD */}
+                {currentUserId && currentAd.artisan_id === currentUserId && (
+                  <button
+                    onClick={() => setAdToDelete(currentAd)}
+                    className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1.5 rounded-md border border-red-400 shadow transition"
+                    title="Delete your advertisement"
+                  >
+                    🗑️ Delete My Ad
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -147,7 +171,7 @@ export const AdBanner: React.FC = () => {
           ad={adToDelete}
           isOpen={!!adToDelete}
           onClose={() => setAdToDelete(null)}
-          onSuccess={fetchAds}
+          onSuccess={handleAdDeleted}
         />
       )}
     </div>
