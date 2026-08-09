@@ -49,8 +49,8 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     });
   };
 
-  // Payment Success Callback Function
-  const handlePaymentSuccess = async (response: any) => {
+  // Process saving to Supabase after payment authorization
+  const saveAdvertisement = async (paymentRef: string) => {
     try {
       const { data: userData } = await supabase.auth.getUser();
 
@@ -63,7 +63,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
         image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
         amount_paid: currentPricing.amount,
         currency,
-        payment_reference: response.reference || response.trxref || 'MOMO_PROMO',
+        payment_reference: paymentRef,
         status: 'active',
       });
 
@@ -78,12 +78,6 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     } finally {
       setLoading(false);
     }
-  };
-
-  // Payment Closed Callback Function
-  const handlePaymentClose = () => {
-    setLoading(false);
-    setError('Payment popup closed. Ad was not published.');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,16 +95,28 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     try {
       const { data: userData } = await supabase.auth.getUser();
       const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
+      const referenceCode = 'AD_' + Math.floor(Math.random() * 1000000000 + 1);
 
-      // Standard function references required by Paystack
+      // Attach explicit global functions on window object to bypass SWC minification
+      (window as any).onPaystackSuccess = function (response: any) {
+        const ref = response?.reference || response?.trxref || referenceCode;
+        saveAdvertisement(ref);
+      };
+
+      (window as any).onPaystackClose = function () {
+        setLoading(false);
+        setError('Payment popup closed. Ad was not published.');
+      };
+
+      // Pass global function references to Paystack Setup
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
         email: email || userData?.user?.email || 'advertiser@credibleartisans.com',
-        amount: currentPricing.amount * 100, // Amount in pesewas / cents
+        amount: currentPricing.amount * 100, // Amount in pesewas
         currency: currency,
-        ref: 'AD_' + Math.floor(Math.random() * 1000000000 + 1),
-        onClose: handlePaymentClose,
-        callback: handlePaymentSuccess,
+        ref: referenceCode,
+        callback: (window as any).onPaystackSuccess,
+        onClose: (window as any).onPaystackClose,
       });
 
       handler.openIframe();
