@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 import { VerificationModal } from '@/components/auth/VerificationModal';
+import { DonateModal } from '@/components/donation/DonateModal';
 
-// Major World Cities List
 const GLOBAL_CITIES = [
   'Accra, Ghana',
   'Kumasi, Ghana',
@@ -21,7 +21,6 @@ const GLOBAL_CITIES = [
   'Sydney, Australia',
 ];
 
-// Sample Nearby Artisans Preview
 const SAMPLE_ARTISANS = [
   { id: '1', name: 'Kwame M.', service: 'Carpentry & Cabinets', location: 'Accra, Ghana' },
   { id: '2', name: 'David R.', service: 'Master Electrician', location: 'London, UK' },
@@ -36,27 +35,40 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   
-  // Show / Hide Password state toggles
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Verification Gate State
+  // Modal States
   const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+  const [isDonateOpen, setIsDonateOpen] = useState(false);
   const [activeUserId, setActiveUserId] = useState('');
 
-  // Artisans Near Me Filter State
   const [searchCity, setSearchCity] = useState('');
   const [searchService, setSearchService] = useState('');
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 1. Google OAuth Handler
+  const handleGoogleSignIn = async () => {
+    try {
+      const { error: googleError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      if (googleError) throw googleError;
+    } catch (err: any) {
+      setError(err.message || 'Google sign in failed.');
+    }
+  };
+
+  // 2. Email / Password Auth Handler
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Password Match Check for Sign Up
     if (isSignUp) {
       if (password !== confirmPassword) {
         setError('Passwords do not match. Please verify your password.');
@@ -72,20 +84,15 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        // Sign Up Flow
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: {
-              full_name: fullName,
-              role: role,
-            },
+            data: { full_name: fullName, role: role },
           },
         });
         if (signUpError) throw signUpError;
         
-        // Open Mandatory ID Verification Modal upon signup
         if (authData.user) {
           setActiveUserId(authData.user.id);
           setIsVerificationOpen(true);
@@ -93,7 +100,6 @@ export default function AuthPage() {
           alert('Account created! Please check your email to verify.');
         }
       } else {
-        // Sign In Flow
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -108,7 +114,6 @@ export default function AuthPage() {
     }
   };
 
-  // Contact Artisan Trigger (Forces Sign Up & ID Verification)
   const handleContactArtisanClick = async (artisan: typeof SAMPLE_ARTISANS[0]) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -124,7 +129,7 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-gray-900 text-white font-sans">
       
-      {/* LEFT COLUMN: Global Visual Showcase & Artisan Near Me Discovery */}
+      {/* LEFT COLUMN: Global Showcase & Donation CTA */}
       <div className="lg:col-span-7 relative hidden lg:flex flex-col justify-between p-12 bg-cover bg-center overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-10000 hover:scale-100"
@@ -134,14 +139,24 @@ export default function AuthPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/60 backdrop-blur-[2px]" />
 
-        {/* Top Brand Logo */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center font-extrabold text-black text-xl shadow-lg">
-            CA
+        {/* Header Branding & DONATE BUTTON */}
+        <div className="relative z-10 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center font-extrabold text-black text-xl shadow-lg">
+              CA
+            </div>
+            <span className="text-2xl font-black tracking-tight text-white">
+              Credible<span className="text-amber-400">Artisans</span>.com
+            </span>
           </div>
-          <span className="text-2xl font-black tracking-tight text-white">
-            Credible<span className="text-amber-400">Artisans</span>.com
-          </span>
+
+          {/* COMPREHENSIVE DONATE BUTTON */}
+          <button
+            onClick={() => setIsDonateOpen(true)}
+            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg border border-rose-400/40 flex items-center gap-1.5 transition animate-pulse"
+          >
+            💖 Support Development / Donate
+          </button>
         </div>
 
         {/* Center Headline & Global Near Me Discovery */}
@@ -153,7 +168,7 @@ export default function AuthPage() {
             Connect with Skilled Artisans Worldwide.
           </h1>
           <p className="text-gray-300 text-sm leading-relaxed">
-            Generate professional Bill of Quantities (BOQ), video call clients live on screen, and showcase your craftsmanship to clients globally.
+            Generate professional Bill of Quantities (BOQ), video call clients live on screen, and showcase your craftsmanship globally.
           </p>
 
           {/* GLOBAL "📍 Artisans Near Me" Discovery Box */}
@@ -165,7 +180,6 @@ export default function AuthPage() {
               <span className="text-[10px] text-gray-400">Sign Up Required to Contact</span>
             </div>
 
-            {/* Worldwide City & Service Dropdowns */}
             <div className="grid grid-cols-2 gap-2">
               <select
                 value={searchCity}
@@ -192,7 +206,6 @@ export default function AuthPage() {
               </select>
             </div>
 
-            {/* Sample Nearby Artisans with Strict Sign Up Gate */}
             <div className="space-y-2 pt-1">
               {SAMPLE_ARTISANS.map((artisan) => (
                 <div key={artisan.id} className="flex justify-between items-center bg-gray-900/80 p-2.5 rounded-lg border border-gray-700/50">
@@ -208,40 +221,6 @@ export default function AuthPage() {
                   </button>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Photo Showcase Grid */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-24 shadow-lg">
-              <img 
-                src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=400" 
-                alt="Welder" 
-                className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-              />
-              <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-[10px] font-bold px-2 py-0.5 rounded text-amber-300">
-                Fabrication
-              </span>
-            </div>
-            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-24 shadow-lg">
-              <img 
-                src="https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=400" 
-                alt="Plumbing" 
-                className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-              />
-              <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-[10px] font-bold px-2 py-0.5 rounded text-amber-300">
-                Plumbing
-              </span>
-            </div>
-            <div className="relative group overflow-hidden rounded-xl border border-white/20 h-24 shadow-lg">
-              <img 
-                src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=400" 
-                alt="Electrical" 
-                className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-              />
-              <span className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-sm text-[10px] font-bold px-2 py-0.5 rounded text-amber-300">
-                Electrical
-              </span>
             </div>
           </div>
         </div>
@@ -263,7 +242,7 @@ export default function AuthPage() {
       {/* RIGHT COLUMN: Auth Form & Self-Service Sponsor Portal */}
       <div className="lg:col-span-5 bg-white text-gray-900 flex flex-col justify-between p-6 sm:p-10 overflow-y-auto">
         
-        {/* Top Toggle Header */}
+        {/* Top Header & Mobile Donate Button */}
         <div className="flex justify-between items-center mb-6">
           <Link href="/" className="lg:hidden flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-black text-sm">
@@ -272,13 +251,17 @@ export default function AuthPage() {
             <span className="font-bold text-lg">CredibleArtisans</span>
           </Link>
 
+          <button
+            onClick={() => setIsDonateOpen(true)}
+            className="lg:hidden bg-rose-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow"
+          >
+            💖 Donate
+          </button>
+
           <div className="text-sm font-medium ml-auto">
             {isSignUp ? 'Already registered?' : "Don't have an account?"}{' '}
             <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError('');
-              }}
+              onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
               className="text-amber-600 hover:text-amber-700 font-bold underline ml-1"
             >
               {isSignUp ? 'Sign In' : 'Register Now'}
@@ -294,10 +277,29 @@ export default function AuthPage() {
               {isSignUp ? 'Create Your Account' : 'Welcome Back'}
             </h2>
             <p className="text-xs text-gray-500 mt-1">
-              {isSignUp
-                ? 'Join CredibleArtisans as an Artisan or Client'
-                : 'Sign in to access your portal, chats, and BOQs'}
+              {isSignUp ? 'Join CredibleArtisans as an Artisan or Client' : 'Sign in to access your portal, chats, and BOQs'}
             </p>
+          </div>
+
+          {/* GOOGLE SIGN IN BUTTON */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-xl shadow-sm transition text-sm"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+            </svg>
+            Continue with Google
+          </button>
+
+          <div className="flex items-center my-4">
+            <div className="flex-1 border-t border-gray-200" />
+            <span className="px-3 text-xs text-gray-400 uppercase font-semibold">Or Email</span>
+            <div className="flex-1 border-t border-gray-200" />
           </div>
 
           {/* Self-Service 20 GHS Sponsor Ad Banner */}
@@ -310,34 +312,23 @@ export default function AuthPage() {
           )}
 
           <form onSubmit={handleAuth} className="space-y-4">
-            
-            {/* Account Role Selector */}
             <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
               <button
                 type="button"
                 onClick={() => setRole('client')}
-                className={`py-2 text-xs font-bold rounded-lg transition ${
-                  role === 'client'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
+                className={`py-2 text-xs font-bold rounded-lg transition ${role === 'client' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
               >
                 👤 I am a Client
               </button>
               <button
                 type="button"
                 onClick={() => setRole('artisan')}
-                className={`py-2 text-xs font-bold rounded-lg transition ${
-                  role === 'artisan'
-                    ? 'bg-amber-500 text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
+                className={`py-2 text-xs font-bold rounded-lg transition ${role === 'artisan' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
               >
                 🛠️ I am an Artisan
               </button>
             </div>
 
-            {/* Name Input (Sign Up Only) */}
             {isSignUp && (
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
@@ -352,7 +343,6 @@ export default function AuthPage() {
               </div>
             )}
 
-            {/* Email Input */}
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Email Address *</label>
               <input
@@ -365,7 +355,6 @@ export default function AuthPage() {
               />
             </div>
 
-            {/* Password Input with 👁️ Eye Toggle */}
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Password *</label>
               <div className="relative">
@@ -381,14 +370,12 @@ export default function AuthPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-base focus:outline-none p-1"
-                  title={showPassword ? 'Hide Password' : 'Show Password'}
                 >
                   {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
             </div>
 
-            {/* Confirm Password Input (Sign Up Only) with 👁️ Eye Toggle */}
             {isSignUp && (
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Confirm Password *</label>
@@ -405,7 +392,6 @@ export default function AuthPage() {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-base focus:outline-none p-1"
-                    title={showConfirmPassword ? 'Hide Password' : 'Show Password'}
                   >
                     {showConfirmPassword ? '🙈' : '👁️'}
                   </button>
@@ -441,6 +427,12 @@ export default function AuthPage() {
         onSuccess={() => {
           window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
         }}
+      />
+
+      {/* Donate Modal */}
+      <DonateModal
+        isOpen={isDonateOpen}
+        onClose={() => setIsDonateOpen(false)}
       />
 
     </div>
