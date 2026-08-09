@@ -35,7 +35,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     setSubmitted(false);
   };
 
-  const loadPaystackScript = () => {
+  const loadPaystackScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
       if ((window as any).PaystackPop) {
         resolve(true);
@@ -44,8 +44,46 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
       const script = document.createElement('script');
       script.src = 'https://js.paystack.co/v1/inline.js';
       script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
       document.body.appendChild(script);
     });
+  };
+
+  // Payment Success Callback Function
+  const handlePaymentSuccess = async (response: any) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+
+      const { error: insertError } = await supabase.from('advertisements').insert({
+        artisan_id: userData?.user?.id || null,
+        shop_name: shopName,
+        headline,
+        category,
+        contact_phone: contactPhone,
+        image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
+        amount_paid: currentPricing.amount,
+        currency,
+        payment_reference: response.reference || response.trxref || 'MOMO_PROMO',
+        status: 'active',
+      });
+
+      if (insertError) {
+        setError(insertError.message);
+      } else {
+        setSubmitted(true);
+        if (onSuccess) onSuccess();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to save advertisement.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Payment Closed Callback Function
+  const handlePaymentClose = () => {
+    setLoading(false);
+    setError('Payment popup closed. Ad was not published.');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,44 +91,26 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     setLoading(true);
     setError('');
 
-    try {
-      await loadPaystackScript();
-      const { data: userData } = await supabase.auth.getUser();
+    const scriptLoaded = await loadPaystackScript();
+    if (!scriptLoaded) {
+      setError('Could not connect to payment gateway. Please check internet connection.');
+      setLoading(false);
+      return;
+    }
 
+    try {
+      const { data: userData } = await supabase.auth.getUser();
       const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
 
+      // Standard function references required by Paystack
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
         email: email || userData?.user?.email || 'advertiser@credibleartisans.com',
-        amount: currentPricing.amount * 100,
+        amount: currentPricing.amount * 100, // Amount in pesewas / cents
         currency: currency,
         ref: 'AD_' + Math.floor(Math.random() * 1000000000 + 1),
-        onClose: () => {
-          setLoading(false);
-          setError('Payment popup closed. Ad was not published.');
-        },
-        callback: async (response: any) => {
-          const { error: insertError } = await supabase.from('advertisements').insert({
-            artisan_id: userData?.user?.id || null,
-            shop_name: shopName,
-            headline,
-            category,
-            contact_phone: contactPhone,
-            image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
-            amount_paid: currentPricing.amount,
-            currency,
-            payment_reference: response.reference,
-            status: 'active',
-          });
-
-          if (insertError) {
-            setError(insertError.message);
-          } else {
-            setSubmitted(true);
-            if (onSuccess) onSuccess();
-          }
-          setLoading(false);
-        },
+        onClose: handlePaymentClose,
+        callback: handlePaymentSuccess,
       });
 
       handler.openIframe();
@@ -240,7 +260,6 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
             </div>
           </form>
         ) : (
-          /* SUCCESS SCREEN with "Advertise Another Product" option */
           <div className="text-center py-6 space-y-4">
             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
               ✓
