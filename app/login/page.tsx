@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
-import { VerificationModal } from '@/components/auth/VerificationModal';
 import { DonateModal } from '@/components/donation/DonateModal';
 
 const GLOBAL_CITIES = [
@@ -37,18 +36,14 @@ export default function AuthPage() {
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Modal States
-  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
   const [isDonateOpen, setIsDonateOpen] = useState(false);
-  const [activeUserId, setActiveUserId] = useState('');
 
   const [searchCity, setSearchCity] = useState('');
   const [searchService, setSearchService] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Google OAuth Handler
+  // 1. Seamless Google OAuth Handler
   const handleGoogleSignIn = async () => {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
@@ -63,7 +58,7 @@ export default function AuthPage() {
     }
   };
 
-  // 2. Email / Password Auth Handler
+  // 2. Seamless Email/Password Auth Handler (Instant Redirect to Portal)
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -71,7 +66,7 @@ export default function AuthPage() {
 
     if (isSignUp) {
       if (password !== confirmPassword) {
-        setError('Passwords do not match. Please verify your password.');
+        setError('Passwords do not match.');
         setLoading(false);
         return;
       }
@@ -84,7 +79,8 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        // Instant Sign Up
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -93,18 +89,17 @@ export default function AuthPage() {
         });
         if (signUpError) throw signUpError;
         
-        if (authData.user) {
-          setActiveUserId(authData.user.id);
-          setIsVerificationOpen(true);
-        } else {
-          alert('Account created! Please check your email to verify.');
-        }
+        // Direct seamless redirect straight to portal!
+        window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       } else {
+        // Instant Sign In
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (signInError) throw signInError;
+
+        // Direct seamless redirect straight to portal!
         window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       }
     } catch (err: any) {
@@ -114,22 +109,16 @@ export default function AuthPage() {
     }
   };
 
-  const handleContactArtisanClick = async (artisan: typeof SAMPLE_ARTISANS[0]) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setIsSignUp(true);
-      setError(`Please sign up and complete ID verification to contact ${artisan.name}.`);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      setActiveUserId(user.id);
-      setIsVerificationOpen(true);
-    }
+  const handleContactArtisanClick = () => {
+    setIsSignUp(true);
+    setError('Please sign up or sign in to enter your user portal and connect with artisans.');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-gray-900 text-white font-sans">
       
-      {/* LEFT COLUMN: Global Showcase & Donation CTA */}
+      {/* LEFT COLUMN: Global Showcase */}
       <div className="lg:col-span-7 relative hidden lg:flex flex-col justify-between p-12 bg-cover bg-center overflow-hidden">
         <div 
           className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-10000 hover:scale-100"
@@ -150,7 +139,6 @@ export default function AuthPage() {
             </span>
           </div>
 
-          {/* COMPREHENSIVE DONATE BUTTON */}
           <button
             onClick={() => setIsDonateOpen(true)}
             className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg border border-rose-400/40 flex items-center gap-1.5 transition animate-pulse"
@@ -214,7 +202,7 @@ export default function AuthPage() {
                     <p className="text-[10px] text-gray-400">📍 {artisan.location}</p>
                   </div>
                   <button
-                    onClick={() => handleContactArtisanClick(artisan)}
+                    onClick={handleContactArtisanClick}
                     className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-[11px] px-3 py-1.5 rounded transition shadow"
                   >
                     💬 Contact
@@ -242,7 +230,6 @@ export default function AuthPage() {
       {/* RIGHT COLUMN: Auth Form & Self-Service Sponsor Portal */}
       <div className="lg:col-span-5 bg-white text-gray-900 flex flex-col justify-between p-6 sm:p-10 overflow-y-auto">
         
-        {/* Top Header & Mobile Donate Button */}
         <div className="flex justify-between items-center mb-6">
           <Link href="/" className="lg:hidden flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-black text-sm">
@@ -269,7 +256,7 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Main Auth Form Container */}
+        {/* Form Container */}
         <div className="max-w-md w-full mx-auto space-y-6 my-auto">
           
           <div>
@@ -281,7 +268,7 @@ export default function AuthPage() {
             </p>
           </div>
 
-          {/* GOOGLE SIGN IN BUTTON */}
+          {/* GOOGLE SIGN IN */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -302,7 +289,6 @@ export default function AuthPage() {
             <div className="flex-1 border-t border-gray-200" />
           </div>
 
-          {/* Self-Service 20 GHS Sponsor Ad Banner */}
           <AdBanner />
 
           {error && (
@@ -413,23 +399,11 @@ export default function AuthPage() {
           </form>
         </div>
 
-        {/* Bottom Footer */}
         <div className="text-center text-xs text-gray-400 mt-6 pt-4 border-t">
           © {new Date().getFullYear()} CredibleArtisans.com. All rights reserved.
         </div>
       </div>
 
-      {/* Verification Gate Modal */}
-      <VerificationModal
-        isOpen={isVerificationOpen}
-        userId={activeUserId}
-        onClose={() => setIsVerificationOpen(false)}
-        onSuccess={() => {
-          window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
-        }}
-      />
-
-      {/* Donate Modal */}
       <DonateModal
         isOpen={isDonateOpen}
         onClose={() => setIsDonateOpen(false)}
