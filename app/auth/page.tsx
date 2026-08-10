@@ -1,8 +1,6 @@
 // app/auth/page.tsx
-'use client';
+import { AuthScreen } from '@/components/auth/AuthScreen';
 
-import AuthPage from '../login/page';
-
-export default function Page() {
-  return <AuthPage />;
+export default function AuthPage() {
+  return <AuthScreen />;
 }

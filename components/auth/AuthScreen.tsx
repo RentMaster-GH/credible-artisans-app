@@ -43,7 +43,6 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Google OAuth Handler
   const handleGoogleSignIn = async () => {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
@@ -58,7 +57,6 @@ export function AuthScreen() {
     }
   };
 
-  // 2. Seamless Auth Handler
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -87,6 +85,7 @@ export function AuthScreen() {
           },
         });
         if (signUpError) throw signUpError;
+        
         window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -94,6 +93,7 @@ export function AuthScreen() {
           password,
         });
         if (signInError) throw signInError;
+
         window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       }
     } catch (err: any) {
@@ -406,5 +406,3 @@ export function AuthScreen() {
     </div>
   );
 }
-
-export default AuthScreen;
