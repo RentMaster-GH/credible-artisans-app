@@ -5,72 +5,76 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import type { Advertisement } from '@/types/advertisement';
 
-interface Props {
+interface DeleteAdModalProps {
   ad: Advertisement;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (deletedAdId: string) => void;
 }
 
-export const DeleteAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess }) => {
+export const DeleteAdModal: React.FC<DeleteAdModalProps> = ({
+  ad,
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
   const handleDelete = async () => {
     setLoading(true);
+    setError('');
 
-    const { error } = await supabase
-      .from('ads')
-      .delete()
-      .eq('id', ad.id);
+    try {
+      const { error: deleteError } = await (supabase.from('ads') as any)
+        .delete()
+        .eq('id', ad.id);
 
-    setLoading(false);
-    if (!error) {
+      if (deleteError) {
+        throw deleteError;
+      }
+
       onSuccess(ad.id);
       onClose();
-    } else {
-      alert('Failed to delete advert: ' + error.message);
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete advert.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div 
-      onClick={onClose} 
-      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
-    >
-      <div 
-        onClick={(e) => e.stopPropagation()} 
-        className="bg-white rounded-2xl max-w-sm w-full p-6 relative text-center space-y-4 shadow-2xl border border-gray-100"
-      >
-        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-          🗑️
-        </div>
-        <h3 className="text-lg font-extrabold text-gray-900">Delete Advert</h3>
-        
-        <p className="text-xs text-gray-600">
-          You are about to remove <strong>"{ad.shop_name}"</strong> from the Auth Screen.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-gray-900 text-white rounded-2xl max-w-sm w-full p-6 border border-gray-800 shadow-2xl">
+        <h3 className="text-lg font-bold text-red-500 mb-2">🗑️ Delete Advertisement</h3>
+        <p className="text-xs text-gray-300 mb-4">
+          Are you sure you want to delete <span className="font-bold text-white">"{ad.shop_name || 'this advert'}"</span>? This action cannot be undone.
         </p>
 
-        <div className="bg-amber-50 p-3 rounded-xl text-amber-900 text-xs text-left leading-relaxed border border-amber-200">
-          ⚠️ <strong>Please Note:</strong> Deleting this advert will remove it off the screen immediately. If you decide to publish another advert in the future, you will have to pay the 20 GHS fee (or foreign currency equivalent) again.
-        </div>
+        {error && (
+          <div className="mb-4 p-2.5 bg-red-900/50 border border-red-500 text-red-200 text-xs rounded-lg">
+            {error}
+          </div>
+        )}
 
-        <div className="flex gap-2 pt-2">
+        <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={onClose}
-            className="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold py-2.5 rounded-lg transition"
+            disabled={loading}
+            className="px-4 py-2 rounded-xl border border-gray-700 text-gray-300 font-bold text-xs hover:bg-gray-800 transition"
           >
-            Keep Advert
+            Cancel
           </button>
           <button
             type="button"
             onClick={handleDelete}
             disabled={loading}
-            className="w-1/2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-lg transition shadow disabled:opacity-50"
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-lg transition disabled:opacity-50"
           >
-            {loading ? 'Deleting...' : 'Delete & Remove'}
+            {loading ? 'Deleting...' : 'Yes, Delete'}
           </button>
         </div>
       </div>
