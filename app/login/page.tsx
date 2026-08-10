@@ -6,6 +6,12 @@ import Link from 'next/link';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 import { DonateModal } from '@/components/donation/DonateModal';
+// app/login/page.tsx
+import { AuthScreen } from '@/components/auth/AuthScreen';
+
+export default function LoginPage() {
+  return <AuthScreen />;
+}
 
 const GLOBAL_CITIES = [
   'Accra, Ghana',

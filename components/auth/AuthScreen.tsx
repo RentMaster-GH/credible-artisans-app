@@ -43,12 +43,13 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 1. Seamless Google OAuth Handler with Callback Route
   const handleGoogleSignIn = async () => {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         },
       });
       if (googleError) throw googleError;
@@ -57,6 +58,7 @@ export function AuthScreen() {
     }
   };
 
+  // 2. Seamless Email/Password Auth Handler
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -262,7 +264,7 @@ export function AuthScreen() {
             </p>
           </div>
 
-          {/* GOOGLE SIGN IN */}
+          {/* GOOGLE SIGN IN WITH FIXED CALLBACK ROUTE */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -406,3 +408,5 @@ export function AuthScreen() {
     </div>
   );
 }
+
+export default AuthScreen;
