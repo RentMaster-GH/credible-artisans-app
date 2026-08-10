@@ -1,4 +1,4 @@
-// app/login/page.tsx
+// components/auth/AuthScreen.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -26,7 +26,7 @@ const SAMPLE_ARTISANS = [
   { id: '3', name: 'Sarah B.', service: 'Plumbing Specialist', location: 'Toronto, Canada' },
 ];
 
-export default function AuthPage() {
+export function AuthScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState<'artisan' | 'client'>('client');
   const [email, setEmail] = useState('');
@@ -43,7 +43,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Seamless Google OAuth Handler
+  // 1. Google OAuth Handler
   const handleGoogleSignIn = async () => {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
@@ -58,7 +58,7 @@ export default function AuthPage() {
     }
   };
 
-  // 2. Seamless Email/Password Auth Handler (Instant Redirect to Portal)
+  // 2. Seamless Auth Handler
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -87,7 +87,6 @@ export default function AuthPage() {
           },
         });
         if (signUpError) throw signUpError;
-        
         window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -95,7 +94,6 @@ export default function AuthPage() {
           password,
         });
         if (signInError) throw signInError;
-
         window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       }
     } catch (err: any) {
@@ -408,3 +406,5 @@ export default function AuthPage() {
     </div>
   );
 }
+
+export default AuthScreen;
