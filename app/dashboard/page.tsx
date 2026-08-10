@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import { InPageChatModal } from '@/components/chat/InPageChatModal'
 
 interface Job {
   id: string
@@ -58,6 +59,10 @@ export default function DashboardPage() {
   // Artisan states
   const [artisanBids, setArtisanBids] = useState<Bid[]>([])
   const [artisanProfile, setArtisanProfile] = useState<ArtisanProfile | null>(null)
+
+  // In-Page Chat State
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
+  const [recipientName, setRecipientName] = useState<string>('User')
 
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -201,7 +206,7 @@ export default function DashboardPage() {
 
     fetchDashboardData()
 
-    // Listen for auth state changes (prevents bouncing on sign out/session refresh)
+    // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         router.push('/login')
@@ -237,6 +242,28 @@ export default function DashboardPage() {
     })
 
     window.location.reload()
+  }
+
+  // Open Live Chat directly inside the Portal Page
+  const handleOpenLiveChat = async (artisanId: string, artisanName: string) => {
+    try {
+      const { data: room, error } = await (supabase.from as any)('chat_rooms')
+        .upsert(
+          { artisan_id: artisanId, client_id: user.id },
+          { onConflict: 'artisan_id,client_id' }
+        )
+        .select('id')
+        .single()
+
+      if (error) throw error
+
+      if (room) {
+        setRecipientName(artisanName)
+        setActiveRoomId(room.id) // Opens floating in-page chat modal
+      }
+    } catch (err: any) {
+      alert('Failed to connect chat: ' + err.message)
+    }
   }
 
   const handleClientBidAction = async (bidId: string, jobId: string, newStatus: 'accepted' | 'rejected') => {
@@ -298,141 +325,149 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center">
+      <div className="min-h-screen bg-gray-950 text-white flex flex-col justify-center items-center">
         <Navbar />
-        <div className="flex flex-col items-center gap-3 my-auto">
-          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm font-medium">Loading your dashboard...</p>
+        <div className="my-auto flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-xs font-semibold tracking-wider uppercase">Loading your Portal...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-950 text-white pb-20 font-sans">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
         
-        {/* Welcome Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-sm">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
-                Welcome back, {fullName}
-              </h1>
-              <span className="bg-indigo-50 text-indigo-700 font-semibold text-xs px-3 py-1 rounded-full uppercase">
-                {userRole} Mode
+        {/* HERO ROLE SWITCHER BANNER */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-400/20">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <span className="bg-black/30 backdrop-blur-md text-amber-200 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-widest border border-amber-300/30">
+                Active Portal: {userRole === 'artisan' ? '🛠️ Artisan Work Portal' : '👤 Client Hiring Portal'}
               </span>
+              <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-3">
+                Welcome back, {fullName}!
+              </h1>
+              <p className="text-amber-100 text-sm mt-1 max-w-xl">
+                {userRole === 'artisan'
+                  ? 'Manage your active project contracts, review submitted proposals, and generate BOQ estimates.'
+                  : 'Manage your posted projects, review artisan proposals, and award contracts.'}
+              </p>
             </div>
-            <p className="text-gray-500 text-sm">
-              {userRole === 'artisan' 
-                ? 'Manage your active project contracts, review submitted proposals, and update your trade portfolio.' 
-                : 'Manage your posted projects, review artisan proposals, and award contracts.'}
-            </p>
-          </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            {userRole === 'artisan' ? (
-              <Link
-                href="/jobs"
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => handleSwitchRole(userRole === 'client' ? 'artisan' : 'client')}
+                className="bg-white text-gray-900 hover:bg-amber-100 font-black text-xs px-5 py-3 rounded-2xl shadow-xl transition transform hover:-translate-y-0.5"
               >
-                Browse Job Board
-              </Link>
-            ) : (
-              <Link
-                href="/jobs/new"
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm shadow-sm transition"
-              >
-                + Post New Job
-              </Link>
-            )}
-            <Link
-              href="/settings"
-              className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition flex items-center gap-1.5"
-            >
-              ⚙️ Account Settings
-            </Link>
+                Switch to {userRole === 'client' ? '🛠️ Artisan Mode' : '👤 Client Mode'}
+              </button>
+
+              {userRole === 'artisan' ? (
+                <Link
+                  href="/artisans/boq"
+                  className="bg-black/40 hover:bg-black/60 border border-white/20 text-white font-bold text-xs px-5 py-3 rounded-2xl shadow transition"
+                >
+                  📐 Generate BOQ Estimate
+                </Link>
+              ) : (
+                <Link
+                  href="/jobs/new"
+                  className="bg-black/40 hover:bg-black/60 border border-white/20 text-white font-bold text-xs px-5 py-3 rounded-2xl shadow transition"
+                >
+                  + Post New Job Request
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* 🌟 INSTANT MODE SWITCHER BANNER FOR GOOGLE & NEW USERS */}
-        <div className="mb-8 p-5 bg-gradient-to-r from-indigo-900 to-indigo-800 text-white rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-indigo-300">
-              Active Role: {userRole === 'artisan' ? '🛠️ Artisan (Worker)' : '👤 Client (Hiring)'}
-            </p>
-            <p className="text-sm font-medium text-indigo-100 mt-1">
-              {userRole === 'client'
-                ? 'Want to offer trade services, submit bids, and get hired? Switch to Artisan Mode!'
-                : 'Want to post jobs and hire local artisans? Switch to Client Mode!'}
+        {/* PORTAL METRICS ROW */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Account Status</p>
+            <p className="text-xl font-black text-green-400 mt-1 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-green-400 rounded-full animate-ping" />
+              Verified User
             </p>
           </div>
 
-          <button
-            onClick={() => handleSwitchRole(userRole === 'client' ? 'artisan' : 'client')}
-            className="bg-white hover:bg-gray-100 text-indigo-900 font-extrabold text-xs px-5 py-3 rounded-xl transition shadow-sm shrink-0"
-          >
-            Switch to {userRole === 'client' ? '🛠️ Artisan Mode' : '👤 Client Mode'}
-          </button>
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+              {userRole === 'artisan' ? 'Submitted Proposals' : 'Posted Projects'}
+            </p>
+            <p className="text-2xl font-black text-amber-400 mt-1">
+              {userRole === 'artisan' ? artisanBids.length : clientJobs.length}
+            </p>
+          </div>
+
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Live Video & Messaging</p>
+            <p className="text-xl font-black text-blue-400 mt-1">100% In-App</p>
+          </div>
+
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+              {userRole === 'artisan' ? 'Trade Skill' : 'Active Contracts'}
+            </p>
+            <p className="text-lg font-black text-white mt-1">
+              {userRole === 'artisan' ? (artisanProfile?.primary_skill || 'General Artisan') : 'Instant Award'}
+            </p>
+          </div>
         </div>
 
         {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">
+          <div className="p-4 bg-red-900/50 border border-red-500/50 text-red-200 text-sm rounded-xl">
             {errorMsg}
           </div>
         )}
 
-        {/* ================= ARTISAN DASHBOARD VIEW ================= */}
+        {/* ================= ARTISAN PORTAL CONTENT ================= */}
         {userRole === 'artisan' ? (
           <div className="space-y-8">
             
-            {/* Artisan Quick Stats Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <p className="text-xs text-gray-400 uppercase font-medium">Primary Trade Skill</p>
-                <p className="text-lg font-bold text-gray-900 mt-1">{artisanProfile?.primary_skill || 'General Artisan'}</p>
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl">
+                <p className="text-xs text-gray-400 uppercase font-bold">Primary Skill</p>
+                <p className="text-lg font-bold text-white mt-1">{artisanProfile?.primary_skill || 'General Artisan'}</p>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <p className="text-xs text-gray-400 uppercase font-medium">Artisan Rating</p>
-                <p className="text-lg font-bold text-amber-600 mt-1">
+              <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl">
+                <p className="text-xs text-gray-400 uppercase font-bold">Rating</p>
+                <p className="text-lg font-bold text-amber-400 mt-1">
                   ★ {artisanProfile?.rating ? artisanProfile.rating.toFixed(1) : 'New'} ({artisanProfile?.jobs_completed || 0} jobs)
                 </p>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <p className="text-xs text-gray-400 uppercase font-medium">Hourly Rate</p>
-                <p className="text-lg font-bold text-gray-900 mt-1">
+              <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl">
+                <p className="text-xs text-gray-400 uppercase font-bold">Rate</p>
+                <p className="text-lg font-bold text-white mt-1">
                   {artisanProfile?.hourly_rate ? `$${artisanProfile.hourly_rate}/hr` : 'Negotiable'}
                 </p>
               </div>
             </div>
 
-            {/* Active Assignments / Awarded Contracts */}
+            {/* Active Assignments */}
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Active Project Assignments</h2>
+              <h2 className="text-xl font-bold text-white mb-4">Active Contracts</h2>
               {artisanBids.filter(b => b.status === 'accepted').length === 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
-                  <p className="text-gray-500 text-sm">No active project assignments yet. Browse the job board and submit proposals to win contracts.</p>
+                <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 text-center text-gray-400 text-xs">
+                  No active project assignments yet. Browse the job board and submit proposals to win contracts.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {artisanBids.filter(b => b.status === 'accepted').map((bid) => (
-                    <div key={bid.id} className="bg-white rounded-2xl border border-green-200 p-6 shadow-sm bg-green-50/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-1 rounded-full uppercase">
+                    <div key={bid.id} className="bg-green-900/20 border border-green-500/30 p-6 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="bg-green-500/20 text-green-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border border-green-500/30">
                           Assigned Contract
                         </span>
-                        <span className="text-sm font-extrabold text-indigo-600">
-                          {bid.jobs?.currency || '$'} {bid.amount}
-                        </span>
+                        <span className="text-sm font-black text-amber-400">{bid.jobs?.currency || 'GH₵'} {bid.amount}</span>
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-1">{bid.jobs?.title}</h3>
-                      <p className="text-xs text-gray-500 mb-4">📍 {bid.jobs?.location}</p>
-                      <div className="bg-white p-4 rounded-xl border border-gray-200 text-xs text-gray-700 space-y-1">
-                        <p><span className="font-semibold">Timeline:</span> {bid.proposed_timeline}</p>
-                        <p><span className="font-semibold">Your Proposal:</span> {bid.cover_letter}</p>
-                      </div>
+                      <h3 className="text-lg font-bold text-white">{bid.jobs?.title}</h3>
+                      <p className="text-xs text-gray-400">📍 {bid.jobs?.location}</p>
                     </div>
                   ))}
                 </div>
@@ -441,39 +476,38 @@ export default function DashboardPage() {
 
             {/* Submitted Proposals Tracker */}
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Your Submitted Proposals ({artisanBids.length})</h2>
+              <h2 className="text-xl font-bold text-white mb-4">Your Submitted Proposals ({artisanBids.length})</h2>
               {artisanBids.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
-                  <p className="text-gray-600 font-medium mb-2">You haven't submitted any proposals yet.</p>
-                  <p className="text-gray-400 text-sm mb-6">Explore the global job board to find open client requests.</p>
-                  <Link href="/jobs" className="inline-block px-6 py-3 rounded-xl bg-indigo-600 text-white font-medium text-sm transition">
+                <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-10 text-center space-y-3">
+                  <p className="text-gray-400 text-sm">You haven't submitted any proposals yet.</p>
+                  <Link href="/jobs" className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs px-5 py-3 rounded-xl transition">
                     Explore Job Board
                   </Link>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {artisanBids.map((bid) => (
-                    <div key={bid.id} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div key={bid.id} className="bg-gray-900/90 border border-gray-800 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase ${
-                            bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                            bid.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                            'bg-amber-100 text-amber-800'
+                          <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase ${
+                            bid.status === 'accepted' ? 'bg-green-500/20 text-green-300 border border-green-500/30' :
+                            bid.status === 'rejected' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                            'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                           }`}>
                             {bid.status}
                           </span>
-                          <span className="text-xs text-gray-400">Submitted on {new Date(bid.created_at).toLocaleDateString()}</span>
+                          <span className="text-xs text-gray-400">Submitted {new Date(bid.created_at).toLocaleDateString()}</span>
                         </div>
-                        <Link href={`/jobs/${bid.job_id}`} className="text-base font-bold text-gray-900 hover:text-indigo-600 transition">
+                        <Link href={`/jobs/${bid.job_id}`} className="text-base font-bold text-white hover:text-amber-400 transition">
                           {bid.jobs?.title || 'Job Listing'}
                         </Link>
-                        <p className="text-xs text-gray-500 mt-1">Timeline: {bid.proposed_timeline}</p>
+                        <p className="text-xs text-gray-400 mt-1">Timeline: {bid.proposed_timeline}</p>
                       </div>
 
                       <div className="text-right">
-                        <p className="text-xs text-gray-400 uppercase font-medium">Bid Amount</p>
-                        <p className="text-base font-bold text-indigo-600">{bid.jobs?.currency || '$'} {bid.amount}</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold">Bid Amount</p>
+                        <p className="text-base font-black text-amber-400">{bid.jobs?.currency || 'GH₵'} {bid.amount}</p>
                       </div>
                     </div>
                   ))}
@@ -483,18 +517,14 @@ export default function DashboardPage() {
 
           </div>
         ) : (
-          /* ================= CLIENT DASHBOARD VIEW ================= */
-          <div className="space-y-6">
-            <h2 className="text-xl font-bold text-gray-900">Your Posted Projects & Proposals</h2>
+          /* ================= CLIENT PORTAL CONTENT ================= */
+          <div className="space-y-8">
+            <h2 className="text-2xl font-black text-white">Your Posted Projects & Incoming Proposals</h2>
 
             {clientJobs.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
-                <p className="text-gray-600 font-medium text-base mb-2">You haven't posted any jobs yet.</p>
-                <p className="text-gray-400 text-sm mb-6">Create a job request to start receiving proposals from global artisans.</p>
-                <Link
-                  href="/jobs/new"
-                  className="inline-block px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition"
-                >
+              <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-10 text-center space-y-3">
+                <p className="text-gray-400 text-sm">You haven't posted any jobs yet. Create a job request to receive proposals from global artisans.</p>
+                <Link href="/jobs/new" className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs px-5 py-3 rounded-xl transition">
                   Post Your First Job
                 </Link>
               </div>
@@ -504,135 +534,87 @@ export default function DashboardPage() {
                   const bids = bidsByJob[job.id] || []
 
                   return (
-                    <div key={job.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-6 border-b border-gray-100">
+                    <div key={job.id} className="bg-gray-900/90 border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-800">
                         <div>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="bg-indigo-50 text-indigo-700 font-semibold text-xs px-2.5 py-1 rounded-full">
-                              {job.category}
-                            </span>
-                            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold uppercase ${
-                              job.status === 'open' ? 'bg-green-50 text-green-700' :
-                              job.status === 'in_progress' ? 'bg-amber-50 text-amber-700' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
-                              {job.status.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <Link href={`/jobs/${job.id}`} className="text-xl font-bold text-gray-900 hover:text-indigo-600 transition">
-                            {job.title}
-                          </Link>
-                          <p className="text-xs text-gray-400 mt-1">
-                            📍 {job.location} • Posted on {new Date(job.created_at).toLocaleDateString()}
-                          </p>
+                          <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30 uppercase">
+                            {job.category}
+                          </span>
+                          <h3 className="text-2xl font-black text-white mt-2">{job.title}</h3>
+                          <p className="text-xs text-gray-400 mt-1">📍 {job.location} • Posted {new Date(job.created_at).toLocaleDateString()}</p>
                         </div>
 
-                        <div className="text-left md:text-right bg-gray-50 p-3 rounded-xl border border-gray-100">
-                          <p className="text-xs text-gray-400 uppercase font-medium">Budget</p>
-                          <p className="text-sm font-bold text-gray-900">
-                            {job.budget_min !== null || job.budget_max !== null ? (
-                              <>
-                                {job.currency} {job.budget_min ?? '0'} {job.budget_max ? `- ${job.budget_max}` : '+'}
-                              </>
-                            ) : (
-                              'Open Budget'
-                            )}
+                        <div className="bg-gray-800/80 p-3 rounded-xl border border-gray-700/60 text-left md:text-right">
+                          <p className="text-[10px] text-gray-400 uppercase font-bold">Estimated Budget</p>
+                          <p className="text-base font-black text-amber-400">
+                            {job.currency} {job.budget_min || '0'} {job.budget_max ? `- ${job.budget_max}` : '+'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="pt-6">
-                        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">
+                      {/* Proposals List */}
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest">
                           Incoming Proposals ({bids.length})
-                        </h3>
+                        </h4>
 
                         {bids.length === 0 ? (
-                          <p className="text-gray-400 text-sm italic py-2">No artisan proposals received yet for this project.</p>
+                          <p className="text-xs text-gray-500 italic">No proposals received yet.</p>
                         ) : (
-                          <div className="space-y-4">
-                            {bids.map((bid) => {
-                              const artisan = bid.artisans
-                              const profile = artisan?.profiles
+                          bids.map((bid) => {
+                            const artisan = bid.artisans
+                            const profile = artisan?.profiles
+                            const artisanName = profile?.full_name || artisan?.business_name || 'Professional Artisan'
 
-                              return (
-                                <div
-                                  key={bid.id}
-                                  className={`border rounded-2xl p-5 transition ${
-                                    bid.status === 'accepted' ? 'border-green-300 bg-green-50/40' :
-                                    bid.status === 'rejected' ? 'border-gray-200 bg-gray-50 opacity-60' :
-                                    'border-gray-200 bg-white hover:border-indigo-200 shadow-sm'
-                                  }`}
-                                >
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-700 text-lg overflow-hidden border border-indigo-200 flex-shrink-0">
-                                        {profile?.avatar_url ? (
-                                          <img src={profile.avatar_url} alt={profile?.full_name} className="w-full h-full object-cover" />
-                                        ) : (
-                                          profile?.full_name?.charAt(0) || 'A'
-                                        )}
-                                      </div>
-                                      <div>
-                                        <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                                          {profile?.full_name || 'Professional Artisan'}
-                                          <span className="text-xs bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded">
-                                            ★ {artisan?.rating ? artisan.rating.toFixed(1) : 'New'}
-                                          </span>
-                                        </h4>
-                                        <p className="text-xs text-gray-500 font-medium">
-                                          {artisan?.business_name || artisan?.primary_skill || 'Independent Contractor'}
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between sm:justify-end gap-4">
-                                      <div className="text-left sm:text-right">
-                                        <p className="text-xs text-gray-400 uppercase font-medium">Proposed Bid</p>
-                                        <p className="text-lg font-extrabold text-indigo-600">
-                                          {job.currency} {bid.amount}
-                                        </p>
-                                      </div>
-                                      <span className={`text-xs font-semibold px-3 py-1 rounded-full uppercase ${
-                                        bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                        bid.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                        'bg-amber-100 text-amber-800'
-                                      }`}>
-                                        {bid.status}
+                            return (
+                              <div key={bid.id} className="bg-gray-800/50 border border-gray-700/60 rounded-xl p-4 sm:p-5 space-y-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div>
+                                    <h5 className="font-bold text-sm text-white flex items-center gap-2">
+                                      {artisanName}
+                                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">
+                                        ★ {artisan?.rating ? artisan.rating.toFixed(1) : 'New'}
                                       </span>
-                                    </div>
+                                    </h5>
+                                    <p className="text-xs text-gray-400">Timeline: {bid.proposed_timeline}</p>
                                   </div>
 
-                                  <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm text-gray-700 space-y-2 border border-gray-100">
-                                    <p className="text-xs font-semibold text-gray-900">
-                                      ⏱️ Proposed Timeline: <span className="font-normal text-gray-600">{bid.proposed_timeline}</span>
-                                    </p>
-                                    <p className="text-xs leading-relaxed">
-                                      <span className="font-semibold text-gray-900">Cover Letter:</span> {bid.cover_letter}
-                                    </p>
-                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-base font-black text-amber-400">{job.currency} {bid.amount}</span>
 
-                                  {bid.status === 'pending' && (
-                                    <div className="flex items-center justify-end gap-3 pt-2">
-                                      <button
-                                        disabled={actionLoading === bid.id}
-                                        onClick={() => handleClientBidAction(bid.id, job.id, 'rejected')}
-                                        className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 font-medium text-xs hover:bg-gray-100 transition disabled:opacity-50"
-                                      >
-                                        Reject
-                                      </button>
-                                      <button
-                                        disabled={actionLoading === bid.id}
-                                        onClick={() => handleClientBidAction(bid.id, job.id, 'accepted')}
-                                        className="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm transition disabled:opacity-50"
-                                      >
-                                        {actionLoading === bid.id ? 'Processing...' : 'Accept & Award Project'}
-                                      </button>
-                                    </div>
-                                  )}
+                                    {/* In-Page Live Chat Button */}
+                                    <button
+                                      onClick={() => handleOpenLiveChat(bid.artisan_id, artisanName)}
+                                      className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow transition flex items-center gap-1"
+                                    >
+                                      💬 Chat & Video Call
+                                    </button>
+                                  </div>
                                 </div>
-                              )
-                            })}
-                          </div>
+
+                                <p className="text-xs text-gray-300 bg-gray-900/60 p-3 rounded-lg border border-gray-800">{bid.cover_letter}</p>
+
+                                {bid.status === 'pending' && (
+                                  <div className="flex items-center justify-end gap-3 pt-2">
+                                    <button
+                                      disabled={actionLoading === bid.id}
+                                      onClick={() => handleClientBidAction(bid.id, job.id, 'rejected')}
+                                      className="px-4 py-1.5 rounded-lg border border-gray-700 text-gray-300 font-bold text-xs hover:bg-gray-800 transition disabled:opacity-50"
+                                    >
+                                      Reject
+                                    </button>
+                                    <button
+                                      disabled={actionLoading === bid.id}
+                                      onClick={() => handleClientBidAction(bid.id, job.id, 'accepted')}
+                                      className="px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white font-black text-xs shadow-md transition disabled:opacity-50"
+                                    >
+                                      {actionLoading === bid.id ? 'Processing...' : 'Accept & Award Contract'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })
                         )}
                       </div>
                     </div>
@@ -643,8 +625,19 @@ export default function DashboardPage() {
           </div>
         )}
 
-      </div>
+      </main>
+
+      {/* FLOATING IN-PAGE CHAT & VIDEO CALL DRAWER */}
+      {activeRoomId && user && (
+        <InPageChatModal
+          isOpen={!!activeRoomId}
+          onClose={() => setActiveRoomId(null)}
+          roomId={activeRoomId}
+          currentUserId={user.id}
+          currentUserName={fullName}
+          recipientName={recipientName}
+        />
+      )}
     </div>
   )
 }
-
