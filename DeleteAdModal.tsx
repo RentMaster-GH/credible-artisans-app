@@ -21,7 +21,7 @@ export const DeleteAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess 
     setLoading(true);
 
     const { error } = await supabase
-      .from('advertisements')
+      .from('ads')
       .delete()
       .eq('id', ad.id);
 
