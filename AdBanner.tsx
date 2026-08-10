@@ -34,8 +34,7 @@ export const AdBanner: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-  setAds(data as unknown as Advertisement[]); // ✅ Satisfies TypeScript compiler
-}
+        setAds(data as unknown as Advertisement[]);
       }
     } catch (err) {
       console.error('Failed to fetch sponsor ads:', err);
