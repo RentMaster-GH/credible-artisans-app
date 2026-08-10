@@ -6,12 +6,6 @@ import Link from 'next/link';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 import { DonateModal } from '@/components/donation/DonateModal';
-// app/login/page.tsx
-import { AuthScreen } from '@/components/auth/AuthScreen';
-
-export default function LoginPage() {
-  return <AuthScreen />;
-}
 
 const GLOBAL_CITIES = [
   'Accra, Ghana',
@@ -32,7 +26,7 @@ const SAMPLE_ARTISANS = [
   { id: '3', name: 'Sarah B.', service: 'Plumbing Specialist', location: 'Toronto, Canada' },
 ];
 
-export default function AuthPage() {
+export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState<'artisan' | 'client'>('client');
   const [email, setEmail] = useState('');
