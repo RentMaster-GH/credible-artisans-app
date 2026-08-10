@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 import { DonateModal } from '@/components/donation/DonateModal';
@@ -26,8 +27,14 @@ const SAMPLE_ARTISANS = [
   { id: '3', name: 'Sarah B.', service: 'Plumbing Specialist', location: 'Toronto, Canada' },
 ];
 
-export function AuthScreen() {
-  const [isSignUp, setIsSignUp] = useState(false);
+interface AuthScreenProps {
+  initialIsSignUp?: boolean;
+}
+
+export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false }) => {
+  const router = useRouter();
+
+  const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [role, setRole] = useState<'artisan' | 'client'>('client');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,7 +50,7 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Seamless Google OAuth Handler with Callback Route
+  // Google OAuth Handler
   const handleGoogleSignIn = async () => {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
@@ -58,7 +65,7 @@ export function AuthScreen() {
     }
   };
 
-  // 2. Seamless Email/Password Auth Handler
+  // Email / Password Auth Handler
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -87,17 +94,18 @@ export function AuthScreen() {
           },
         });
         if (signUpError) throw signUpError;
-        
-        window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (signInError) throw signInError;
-
-        window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       }
+
+      const targetPath = role === 'artisan' ? '/artisan/boq' : '/dashboard';
+      router.push(targetPath);
+      router.refresh();
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -264,7 +272,7 @@ export function AuthScreen() {
             </p>
           </div>
 
-          {/* GOOGLE SIGN IN WITH FIXED CALLBACK ROUTE */}
+          {/* GOOGLE SIGN IN */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -407,6 +415,4 @@ export function AuthScreen() {
 
     </div>
   );
-}
-
-export default AuthScreen;
+};
