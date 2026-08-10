@@ -1,2 +1,8 @@
 // app/sign-in/page.tsx
-export { default } from '../login/page';
+'use client';
+
+import AuthPage from '../login/page';
+
+export default function Page() {
+  return <AuthPage />;
+}
