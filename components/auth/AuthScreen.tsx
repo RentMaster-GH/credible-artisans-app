@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 import { DonateModal } from '@/components/donation/DonateModal';
+import { InPageChatModal } from '@/components/chat/InPageChatModal'; // <-- IMPORT
 
 const GLOBAL_CITIES = [
   'Accra, Ghana',
@@ -45,12 +46,54 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isDonateOpen, setIsDonateOpen] = useState(false);
 
+  // In-Page Chat State
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string>('Client');
+  const [recipientName, setRecipientName] = useState<string>('Artisan');
+
   const [searchCity, setSearchCity] = useState('');
   const [searchService, setSearchService] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Google OAuth Handler
+  // Handle Contact Artisan directly inside the current page
+  const handleContactArtisanClick = async (artisan: any) => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        setIsSignUp(true);
+        setError('Please sign up or sign in to open a live chat and video call with artisans.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // Create or fetch private chat room between client and artisan
+      const { data: room, error: roomError } = await (supabase.from as any)('chat_rooms')
+        .upsert(
+          { artisan_id: artisan.id, client_id: user.id },
+          { onConflict: 'artisan_id,client_id' }
+        )
+        .select('id')
+        .single();
+
+      if (roomError) throw roomError;
+
+      if (room) {
+        setCurrentUserId(user.id);
+        setCurrentUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'Client');
+        setRecipientName(artisan.name);
+        setActiveRoomId(room.id); // 🌟 Opens floating chat window directly on the same page!
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect live chat.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
@@ -65,7 +108,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
     }
   };
 
-  // Email / Password Auth Handler
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -111,12 +153,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleContactArtisanClick = () => {
-    setIsSignUp(true);
-    setError('Please sign up or sign in to enter your user portal and connect with artisans.');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -206,8 +242,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
                     <p className="text-[10px] text-gray-400">📍 {artisan.location}</p>
                   </div>
                   <button
-                    onClick={handleContactArtisanClick}
-                    className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-[11px] px-3 py-1.5 rounded transition shadow"
+                    onClick={() => handleContactArtisanClick(artisan)}
+                    className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-[11px] px-3 py-1.5 rounded transition shadow flex items-center gap-1"
                   >
                     💬 Contact
                   </button>
@@ -374,7 +410,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
                     type={showConfirmPassword ? 'text' : 'password'}
                     required
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => setShowConfirmPassword(!showConfirmPassword)}
                     placeholder="••••••••"
                     className="w-full border border-gray-300 rounded-xl p-3 text-sm pr-10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   />
@@ -412,6 +448,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
         isOpen={isDonateOpen}
         onClose={() => setIsDonateOpen(false)}
       />
+
+      {/* FLOATING IN-PAGE CHAT & VIDEO MODAL */}
+      {activeRoomId && currentUserId && (
+        <InPageChatModal
+          isOpen={!!activeRoomId}
+          onClose={() => setActiveRoomId(null)}
+          roomId={activeRoomId}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
+          recipientName={recipientName}
+        />
+      )}
 
     </div>
   );
