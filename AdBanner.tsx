@@ -28,7 +28,7 @@ export const AdBanner: React.FC = () => {
   const fetchAds = async () => {
     try {
       const { data, error } = await supabase
-        .from('advertisements')
+        .from('ads')
         .select('*')
         .eq('status', 'active')
         .order('created_at', { ascending: false });
