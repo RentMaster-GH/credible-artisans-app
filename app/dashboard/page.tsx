@@ -1,3 +1,4 @@
+// app/dashboard/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -62,6 +63,8 @@ export default function DashboardPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
+    let isMounted = true
+
     const fetchDashboardData = async () => {
       setLoading(true)
 
@@ -69,10 +72,13 @@ export default function DashboardPage() {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
 
       if (userError || !user) {
-        router.push('/login')
+        if (isMounted) {
+          router.push('/login')
+        }
         return
       }
 
+      if (!isMounted) return
       setUser(user)
 
       // 2. Fetch user profile
@@ -129,7 +135,7 @@ export default function DashboardPage() {
           artProfile = newArtProfile
         }
 
-        if (artProfile) {
+        if (artProfile && isMounted) {
           setArtisanProfile(artProfile as unknown as ArtisanProfile)
         }
 
@@ -142,7 +148,7 @@ export default function DashboardPage() {
           .eq('artisan_id', user.id)
           .order('created_at', { ascending: false })
 
-        if (!bidsError && myBids) {
+        if (!bidsError && myBids && isMounted) {
           setArtisanBids(myBids as unknown as Bid[])
         }
       } 
@@ -154,7 +160,7 @@ export default function DashboardPage() {
           .eq('client_id', user.id)
           .order('created_at', { ascending: false })
 
-        if (!jobsError && userJobs) {
+        if (!jobsError && userJobs && isMounted) {
           setClientJobs(userJobs as unknown as Job[])
 
           if (userJobs.length > 0) {
@@ -176,7 +182,7 @@ export default function DashboardPage() {
               .in('job_id', jobIds)
               .order('created_at', { ascending: false })
 
-            if (bidsData) {
+            if (bidsData && isMounted) {
               const grouped: Record<string, any[]> = {}
               bidsData.forEach((bid: any) => {
                 if (!grouped[bid.job_id]) grouped[bid.job_id] = []
@@ -188,10 +194,24 @@ export default function DashboardPage() {
         }
       }
 
-      setLoading(false)
+      if (isMounted) {
+        setLoading(false)
+      }
     }
 
     fetchDashboardData()
+
+    // Listen for auth state changes (prevents bouncing on sign out/session refresh)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        router.push('/login')
+      }
+    })
+
+    return () => {
+      isMounted = false
+      authListener.subscription.unsubscribe()
+    }
   }, [router, supabase])
 
   // Instant Mode Switcher Handler
@@ -278,9 +298,12 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center">
         <Navbar />
-        <div className="text-center py-20 text-gray-500 text-sm">Loading dashboard...</div>
+        <div className="flex flex-col items-center gap-3 my-auto">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 text-sm font-medium">Loading your dashboard...</p>
+        </div>
       </div>
     )
   }
