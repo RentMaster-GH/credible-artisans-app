@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AdBanner } from '@/AdBanner';
 import { supabase } from '@/lib/supabaseClient';
 import { DonateModal } from '@/components/donation/DonateModal';
@@ -27,6 +28,8 @@ const SAMPLE_ARTISANS = [
 ];
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [role, setRole] = useState<'artisan' | 'client'>('client');
   const [email, setEmail] = useState('');
@@ -43,13 +46,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 1. Seamless Google OAuth Handler
+  // 1. Seamless Google OAuth Handler (Redirects to Auth Callback Route)
   const handleGoogleSignIn = async () => {
     try {
       const { error: googleError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         },
       });
       if (googleError) throw googleError;
@@ -58,7 +61,7 @@ export default function LoginPage() {
     }
   };
 
-  // 2. Seamless Email/Password Auth Handler (Instant Redirect to Portal)
+  // 2. Seamless Email/Password Auth Handler (Redirects using useRouter)
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -87,17 +90,19 @@ export default function LoginPage() {
           },
         });
         if (signUpError) throw signUpError;
-        
-        window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (signInError) throw signInError;
-
-        window.location.href = role === 'artisan' ? '/artisan/boq' : '/dashboard';
       }
+
+      // Smooth navigation and session refresh
+      const targetPath = role === 'artisan' ? '/artisan/boq' : '/dashboard';
+      router.push(targetPath);
+      router.refresh();
+
     } catch (err: any) {
       setError(err.message);
     } finally {
