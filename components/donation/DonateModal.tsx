@@ -12,7 +12,7 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [currency, setCurrency] = useState<'GHS' | 'USD'>('GHS');
   const [selectedAmount, setSelectedAmount] = useState<number>(20);
   const [customAmount, setCustomAmount] = useState<string>('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [donorName, setDonorName] = useState('');
   const [loading, setLoading] = useState(false);
   const [donated, setDonated] = useState(false);
@@ -51,6 +51,12 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
       return;
     }
 
+    if (!phone) {
+      setError('Please enter your phone number.');
+      setLoading(false);
+      return;
+    }
+
     const scriptLoaded = await loadPaystackScript();
     if (!scriptLoaded) {
       setError('Unable to load payment gateway. Please check internet connection.');
@@ -61,6 +67,10 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
     try {
       const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
       const referenceCode = 'DONATE_' + Math.floor(Math.random() * 1000000000 + 1);
+
+      // Clean phone format for receipt
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const receiptEmail = `${cleanPhone || 'supporter'}@credibleartisans.com`;
 
       (window as any).onDonateSuccess = function () {
         setDonated(true);
@@ -73,7 +83,7 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
-        email: email || 'supporter@credibleartisans.com',
+        email: receiptEmail,
         amount: Math.round(finalAmount * 100), // Pesewas or Cents
         currency: currency,
         ref: referenceCode,
@@ -158,7 +168,7 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 value={customAmount}
                 onChange={(e) => setCustomAmount(e.target.value)}
                 placeholder={`Custom amount in ${currency}`}
-                className="w-full border rounded-lg p-2.5 text-sm"
+                className="w-full border rounded-lg p-2.5 text-xs text-gray-900 bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"
               />
             </div>
 
@@ -171,18 +181,18 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   value={donorName}
                   onChange={(e) => setDonorName(e.target.value)}
                   placeholder="e.g. Ama Serwaa"
-                  className="w-full border rounded-lg p-2 text-xs"
+                  className="w-full border rounded-lg p-2.5 text-xs text-gray-900 bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Email / Phone *</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number *</label>
                 <input
-                  type="email"
+                  type="tel"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="for MoMo receipt"
-                  className="w-full border rounded-lg p-2 text-xs"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. +233 24 000 0000"
+                  className="w-full border rounded-lg p-2.5 text-xs text-gray-900 bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 />
               </div>
             </div>
