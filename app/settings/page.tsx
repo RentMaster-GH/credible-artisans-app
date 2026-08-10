@@ -89,7 +89,7 @@ export default function SettingsPage() {
     if (newRole === role || !user) return
     setUpdating(true)
 
-    await supabase.from('profiles').upsert({ id: user.id, role: newRole } as any)
+    await (supabase.from as any)('profiles').upsert({ id: user.id, role: newRole } as any)
     await supabase.auth.updateUser({ data: { role: newRole } })
 
     setRole(newRole)
@@ -120,7 +120,7 @@ export default function SettingsPage() {
   const handleDeleteAvatar = async () => {
     if (!confirm('Are you sure you want to remove your profile picture?')) return
     setAvatarUrl(null)
-    await supabase.from('profiles').update({ avatar_url: null } as any).eq('id', user.id)
+    await (supabase.from as any)('profiles').update({ avatar_url: null } as any).eq('id', user.id)
     setMessage('Profile picture removed.')
   }
 
@@ -317,3 +317,4 @@ export default function SettingsPage() {
     </div>
   )
 }
+

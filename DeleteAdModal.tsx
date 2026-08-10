@@ -28,7 +28,7 @@ export const DeleteAdModal: React.FC<DeleteAdModalProps> = ({
     setError('');
 
     try {
-      const { error: deleteError } = await (supabase.from('ads') as any)
+      const { error: deleteError } = await ((supabase.from as any)('ads') as any)
         .delete()
         .eq('id', ad.id);
 
@@ -81,3 +81,4 @@ export const DeleteAdModal: React.FC<DeleteAdModalProps> = ({
     </div>
   );
 };
+

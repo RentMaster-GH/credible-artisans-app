@@ -121,7 +121,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
 
     // Insert Bid
-    const { error: insertError } = await supabase.from('bids').insert({
+    const { error: insertError } = await (supabase.from as any)('bids').insert({
       job_id: jobId,
       artisan_id: currentUser.id,
       amount: amountNum,
@@ -334,3 +334,4 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     </div>
   )
 }
+

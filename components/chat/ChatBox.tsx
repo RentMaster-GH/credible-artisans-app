@@ -33,8 +33,7 @@ export const ChatBox: React.FC<Props> = ({
   // 1. Fetch initial message history
   useEffect(() => {
     async function fetchMessages() {
-      const { data, error } = await supabase
-        .from('chat_messages')
+      const { data, error } = await (supabase.from as any)('chat_messages')
         .select('*')
         .eq('room_id', roomId)
         .order('created_at', { ascending: true });
@@ -61,7 +60,7 @@ export const ChatBox: React.FC<Props> = ({
           table: 'chat_messages',
           filter: `room_id=eq.${roomId}`,
         },
-        (payload) => {
+        (payload: any) => {
           const newMessage = payload.new as ChatMessage;
           setMessages((prev) => [...prev, newMessage]);
           scrollToBottom();
@@ -85,7 +84,7 @@ export const ChatBox: React.FC<Props> = ({
 
     if (!isVideoCallInvite) setText('');
 
-    const { error } = await supabase.from('chat_messages').insert({
+    const { error } = await (supabase.from as any)('chat_messages').insert({
       room_id: roomId,
       sender_id: currentUserId,
       message: content,

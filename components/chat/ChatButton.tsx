@@ -23,8 +23,7 @@ export const ChatButton: React.FC<Props> = ({
     setLoading(true);
     try {
       // Automatically creates or finds the private chat room between this artisan and client
-      const { data: room, error } = await supabase
-        .from('chat_rooms')
+      const { data: room, error } = await (supabase.from as any)('chat_rooms')
         .upsert(
           { artisan_id: artisanId, client_id: clientId },
           { onConflict: 'artisan_id,client_id' }

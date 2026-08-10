@@ -65,7 +65,7 @@ export default function AdminAdsPage() {
     e.preventDefault()
     setSubmitting(true)
 
-    const { error } = await (supabase.from('ads') as any).insert({
+    const { error } = await ((supabase.from as any)('ads') as any).insert({
       business_name: title,
       creative_url: imageUrl,
       destination_url: targetUrl,
@@ -257,3 +257,4 @@ export default function AdminAdsPage() {
     </div>
   )
 }
+

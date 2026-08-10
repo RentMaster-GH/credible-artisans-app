@@ -25,9 +25,7 @@ export const EditAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess })
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase
-      .from('advertisements')
-      .update({
+    const { error } = await (supabase.from as any)('ads').update({
         shop_name: shopName,
         headline,
         contact_phone: contactPhone,
@@ -50,7 +48,7 @@ export const EditAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess })
     setLoading(true);
 
     const { error } = await supabase
-      .from('advertisements')
+      .from('ads')
       .delete()
       .eq('id', ad.id);
 
@@ -141,3 +139,4 @@ export const EditAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess })
     </div>
   );
 };
+

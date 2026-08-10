@@ -53,7 +53,7 @@ export default function SignupPage() {
 
     // 2. Insert or update the profile row in the profiles table
     if (authData.user) {
-      const { error: profileError } = await (supabase.from('profiles') as any).upsert({
+      const { error: profileError } = await ((supabase.from as any)('profiles') as any).upsert({
         id: authData.user.id,
         full_name: fullName,
         role: role,
@@ -171,3 +171,4 @@ export default function SignupPage() {
     </div>
   )
 }
+

@@ -18,8 +18,7 @@ export const PortalKycSection: React.FC = () => {
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
+        const { data: profile } = await (supabase.from as any)('profiles')
           .select('is_verified, id_type, id_number, location')
           .eq('id', user.id)
           .single();
@@ -44,8 +43,7 @@ export const PortalKycSection: React.FC = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase
-      .from('profiles')
+    const { error } = await (supabase.from as any)('profiles')
       .update({
         id_type: idType,
         id_number: idNumber,
@@ -163,3 +161,4 @@ export const PortalKycSection: React.FC = () => {
     </div>
   );
 };
+

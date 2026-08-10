@@ -41,7 +41,7 @@ export const CreateAdModal: React.FC<CreateAdModalProps> = ({
       }
 
       // Insert advertisement into 'ads' table
-      const { error: insertError } = await (supabase.from('ads') as any).insert([
+      const { error: insertError } = await ((supabase.from as any)('ads') as any).insert([
         {
           artisan_id: user.id,
           shop_name: shopName,
@@ -193,3 +193,4 @@ export const CreateAdModal: React.FC<CreateAdModalProps> = ({
     </div>
   );
 };
+

@@ -27,7 +27,7 @@ export default function VerificationUploadPage() {
       return
     }
 
-    const { error } = await supabase.from('verifications').insert({
+    const { error } = await (supabase.from as any)('verifications').insert({
       user_id: user.id,
       id_type: idType,
       id_document_url: documentUrl,
@@ -118,3 +118,4 @@ export default function VerificationUploadPage() {
     </div>
   )
 }
+

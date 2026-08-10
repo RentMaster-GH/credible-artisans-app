@@ -1,2 +1,8 @@
-// Redirect all imports to use the cookie-enabled @supabase/ssr client
-export { supabase, createClient } from './supabase/client';
+// lib/supabaseClient.ts
+import { createBrowserClient } from '@supabase/ssr';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+export const createClient = () => createBrowserClient<any>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient();

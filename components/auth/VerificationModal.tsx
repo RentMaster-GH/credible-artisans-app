@@ -27,8 +27,7 @@ export const VerificationModal: React.FC<Props> = ({ isOpen, userId, onClose, on
     setError('');
 
     try {
-      const { error: updateError } = await supabase
-        .from('profiles')
+      const { error: updateError } = await (supabase.from as any)('profiles')
         .update({
           id_type: idType,
           id_number: idNumber,

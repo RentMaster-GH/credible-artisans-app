@@ -1,7 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/database.types'
 
-let client: ReturnType<typeof createBrowserClient<Database>> | undefined
+let client: ReturnType<typeof createBrowserClient<any>> | undefined
 
 // Return a single shared instance of the browser client
 export function createClient() {

@@ -22,7 +22,7 @@ export default function SupportPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Submit to customer_support table
-    const { error } = await supabase.from('customer_support').insert({
+    const { error } = await (supabase.from as any)('customer_support').insert({
       ticket_type: category, // 👈 Required by your database schema!
       category,
       subject,
@@ -128,3 +128,4 @@ export default function SupportPage() {
     </div>
   )
 }
+

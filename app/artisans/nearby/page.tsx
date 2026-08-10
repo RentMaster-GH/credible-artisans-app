@@ -87,7 +87,7 @@ export default function NearbyArtisansPage() {
 
   const fetchAndSortArtisans = async (refLat: number, refLng: number) => {
     setLoading(true)
-    const { data, error } = await supabase.from('profiles').select('*')
+    const { data, error } = await (supabase.from as any)('profiles').select('*')
 
     if (!error && data) {
       const processed: ArtisanProfile[] = (data as any[]).map((artisan) => {
@@ -228,3 +228,4 @@ export default function NearbyArtisansPage() {
     </div>
   )
 }
+

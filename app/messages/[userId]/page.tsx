@@ -128,7 +128,7 @@ export default function ChatPage() {
     const text = newMessage.trim()
     setNewMessage('')
 
-    const { error } = await supabase.from('messages').insert({
+    const { error } = await (supabase.from as any)('messages').insert({
       sender_id: currentUser.id,
       recipient_id: activePartner.id,
       content: text,
@@ -268,3 +268,4 @@ export default function ChatPage() {
     </div>
   )
 }
+

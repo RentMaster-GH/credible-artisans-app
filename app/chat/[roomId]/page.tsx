@@ -32,9 +32,8 @@ export default function ChatRoomPage() {
         setUserId(user.id);
         setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User');
 
-        // 2. Fetch Chat Room Details & Participant Info
-        const { data: room, error: roomError } = await supabase
-          .from('chat_rooms')
+        // 2. Fetch Chat Room Details & Participant Info (Corrected single call)
+        const { data: room, error: roomError } = await (supabase.from as any)('chat_rooms')
           .select(`
             *,
             artisan:artisan_id (id, full_name, email),
@@ -105,3 +104,4 @@ export default function ChatRoomPage() {
     </div>
   );
 }
+

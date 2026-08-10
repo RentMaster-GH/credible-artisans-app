@@ -122,7 +122,7 @@ export default function ArtisanDirectoryPage() {
     const newRole = userRole === 'artisan' ? 'client' : 'artisan'
 
     // Update in Supabase profiles table
-    const { error } = await (supabase.from('profiles') as any)
+    const { error } = await ((supabase.from as any)('profiles') as any)
       .update({ role: newRole })
       .eq('id', user.id)
 
@@ -152,7 +152,7 @@ export default function ArtisanDirectoryPage() {
     setSavingSettings(true)
     setSettingsMsg(null)
 
-    const { error } = await (supabase.from('profiles') as any)
+    const { error } = await ((supabase.from as any)('profiles') as any)
       .update({
         is_available: isAvailable,
         hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
@@ -164,7 +164,7 @@ export default function ArtisanDirectoryPage() {
       setSettingsMsg('Failed to update settings: ' + error.message)
     } else {
       setSettingsMsg('Settings updated successfully!')
-      const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true })
+      const { data } = await (supabase.from as any)('profiles').select('*').order('full_name', { ascending: true })
       if (data) setArtisans(data as unknown as Artisan[])
     }
     setSavingSettings(false)
@@ -178,7 +178,7 @@ export default function ArtisanDirectoryPage() {
     setSavingClientSettings(true)
     setClientSettingsMsg(null)
 
-    const { error } = await (supabase.from('profiles') as any)
+    const { error } = await ((supabase.from as any)('profiles') as any)
       .update({
         client_company: clientCompany.trim(),
         client_phone: clientPhone.trim(),
@@ -524,3 +524,4 @@ export default function ArtisanDirectoryPage() {
     </div>
   )
 }
+

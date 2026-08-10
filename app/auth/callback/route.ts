@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       const googleRole = user.user_metadata?.role || 'client';
 
       // 2. Ensure profile row exists in Supabase
-      await supabase.from('profiles').upsert({
+      await (supabase.from as any)('profiles').upsert({
         id: user.id,
         full_name: googleName,
         role: googleRole,
@@ -67,3 +67,4 @@ export async function GET(request: Request) {
   // Fallback if code exchange fails
   return NextResponse.redirect(`${origin}/login?error=oauth_failed`);
 }
+

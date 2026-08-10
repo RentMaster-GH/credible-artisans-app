@@ -63,7 +63,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     try {
       const { data: userData } = await supabase.auth.getUser();
 
-      const { error: insertError } = await supabase.from('advertisements').insert({
+      const { error: insertError } = await (supabase.from as any)('ads').insert({
         artisan_id: userData?.user?.id || null,
         shop_name: shopName,
         headline,
@@ -357,3 +357,4 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     </div>
   );
 };
+

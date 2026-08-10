@@ -97,7 +97,7 @@ export default function DashboardPage() {
           'Valued User'
         const googleRole = user.user_metadata?.role || 'client'
 
-        await supabase.from('profiles').upsert({
+        await (supabase.from as any)('profiles').upsert({
           id: user.id,
           full_name: googleName,
           role: googleRole,
@@ -120,7 +120,7 @@ export default function DashboardPage() {
 
         // If Google user switched to Artisan, auto-create artisans table row if missing
         if (!artProfile) {
-          await supabase.from('artisans').upsert({
+          await (supabase.from as any)('artisans').upsert({
             id: user.id,
             business_name: (profileData?.full_name || 'Artisan') + ' Services',
             primary_skill: 'General Artisan',
@@ -218,14 +218,14 @@ export default function DashboardPage() {
   const handleSwitchRole = async (newRole: 'client' | 'artisan') => {
     setLoading(true)
 
-    await supabase.from('profiles').upsert({
+    await (supabase.from as any)('profiles').upsert({
       id: user.id,
       role: newRole,
       full_name: fullName,
     } as any)
 
     if (newRole === 'artisan') {
-      await supabase.from('artisans').upsert({
+      await (supabase.from as any)('artisans').upsert({
         id: user.id,
         business_name: fullName + ' Trade Services',
         primary_skill: 'General Artisan',
@@ -255,12 +255,12 @@ export default function DashboardPage() {
     }
 
     if (newStatus === 'accepted') {
-      await supabase.from('jobs').update({ status: 'in_progress' }).eq('id', jobId)
+      await (supabase.from as any)('jobs').update({ status: 'in_progress' }).eq('id', jobId)
 
       const otherBids = (bidsByJob[jobId] || []).filter((b) => b.id !== bidId)
       for (const other of otherBids) {
         if (other.status === 'pending') {
-          await supabase.from('bids').update({ status: 'rejected' }).eq('id', other.id)
+          await (supabase.from as any)('bids').update({ status: 'rejected' }).eq('id', other.id)
         }
       }
     }
@@ -647,3 +647,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+

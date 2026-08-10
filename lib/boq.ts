@@ -47,8 +47,7 @@ export async function createBoq(input: CreateBoqInput, artisanId: string) {
   const boqNumber = generateBoqNumber();
 
   // 1. Insert into boqs table
-  const { data: boq, error: boqError } = await supabase
-    .from('boqs')
+  const { data: boq, error: boqError } = await (supabase.from as any)('boqs')
     .insert({
       boq_number: boqNumber,
       title: input.title,
