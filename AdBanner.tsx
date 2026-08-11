@@ -97,7 +97,7 @@ export const AdBanner: React.FC = () => {
               
               <div className="pt-2 flex items-center justify-center md:justify-start gap-3">
                 <a
-                  href={`https://wa.me/${currentAd.contact_phone.replace(/[^0-9]/g, '')}`}
+                  href={`https://wa.me/${(currentAd?.contact_phone || '').replace(/[^0-9]/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white font-bold text-xs px-3 py-1.5 rounded-md shadow"

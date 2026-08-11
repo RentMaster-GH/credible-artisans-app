@@ -69,7 +69,7 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
       const referenceCode = 'DONATE_' + Math.floor(Math.random() * 1000000000 + 1);
 
       // Clean phone format for receipt
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
       const receiptEmail = `${cleanPhone || 'supporter'}@credibleartisans.com`;
 
       (window as any).onDonateSuccess = function () {
