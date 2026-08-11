@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 
 export default function VerificationUploadPage() {
-  const [idType, setIdType] = useState('National ID / Ghana Card')
+  const [idType, setIdType] = useState('National ID')
   const [documentUrl, setDocumentUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -84,7 +84,7 @@ export default function VerificationUploadPage() {
                   onChange={(e) => setIdType(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-emerald-500"
                 >
-                  <option value="National ID / Ghana Card">National ID / Ghana Card</option>
+                  <option value="National ID">National ID</option>
                   <option value="Passport">Passport</option>
                   <option value="Voter ID">Voter ID</option>
                   <option value="Driver's License">Driver's License</option>

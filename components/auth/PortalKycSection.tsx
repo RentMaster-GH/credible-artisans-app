@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 export const PortalKycSection: React.FC = () => {
   const [isVerified, setIsVerified] = useState(false);
-  const [idType, setIdType] = useState('ghana_card');
+  const [idType, setIdType] = useState('national_id');
   const [idNumber, setIdNumber] = useState('');
   const [location, setLocation] = useState('');
   const [idDocumentUrl, setIdDocumentUrl] = useState('');

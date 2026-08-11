@@ -22,7 +22,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
   const [currency, setCurrency] = useState<AdCurrency>('GHS');
 
   // Mandatory ID Verification State
-  const [idType, setIdType] = useState('ghana_card');
+  const [idType, setIdType] = useState('national_id');
   const [idNumber, setIdNumber] = useState('');
   const [idDocumentUrl, setIdDocumentUrl] = useState('');
 
@@ -279,7 +279,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
                     onChange={(e) => setIdType(e.target.value)}
                     className="w-full border rounded p-2 text-xs bg-white"
                   >
-                    <option value="ghana_card">Ghana Card</option>
+                    <option value="ghana_card">National ID</option>
                     <option value="passport">Passport</option>
                     <option value="drivers_license">Driver's License</option>
                   </select>
