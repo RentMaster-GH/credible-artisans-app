@@ -23,7 +23,7 @@ export default function ArtisanBoqListPage() {
         }
       } catch (err) {
         console.error('Failed to load BOQs:', err);
-      } font-medium {
+      } finally {
         setLoading(false);
       }
     }
@@ -64,7 +64,7 @@ export default function ArtisanBoqListPage() {
 
           <div className="flex items-center gap-3">
             <Link
-              href="/artisan/boq/new"
+              href="/artisans/boq/new"
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center gap-2 text-sm"
             >
               <span>+ Create New BOQ</span>
@@ -140,7 +140,7 @@ export default function ArtisanBoqListPage() {
             </p>
             {!searchTerm && (
               <Link
-                href="/artisan/boq/new"
+                href="/artisans/boq/new"
                 className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition"
               >
                 + Create New BOQ
