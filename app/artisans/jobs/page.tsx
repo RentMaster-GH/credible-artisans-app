@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Navbar from '@/components/Navbar';
 
 const JOBS_DATA = [
   {
@@ -52,93 +53,77 @@ export default function JobMarketplacePage() {
   const categories = ['All', 'Electrical', 'Carpentry', 'Plumbing & Tiling', 'Masonry', 'Painting'];
 
   return (
-    <div className="min-h-screen bg-gray-50/60 p-4 md:p-8 space-y-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gray-950 text-white pb-20 font-sans">
+      <Navbar />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
         
-        {/* HERO BANNER - Matched to Portal Dashboard */}
-        <div className="bg-gradient-to-r from-slate-900 via-gray-900 to-slate-800 text-white rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
-          
+        {/* HERO ROLE BANNER - Matched to Dashboard */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-400/20">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <div>
+              <span className="bg-black/30 backdrop-blur-md text-amber-200 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-widest border border-amber-300/30">
                 ACTIVE PORTAL: 🛠️ ARTISAN WORK PORTAL
-              </div>
-              <h1 className="text-3xl md:text-4xl font-black tracking-tight">Job Marketplace</h1>
-              <p className="text-gray-300 text-sm md:text-base leading-relaxed">
-                Browse verified client contracts, submit competitive proposals, and win new artisan projects.
+              </span>
+              <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-3">
+                Job Marketplace
+              </h1>
+              <p className="text-amber-100 text-sm mt-1 max-w-xl">
+                Browse verified client contracts, submit competitive proposals, and win new artisan contracts.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Link
                 href="/artisans/boq"
-                className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-semibold px-4 py-2.5 rounded-xl text-sm transition backdrop-blur-md"
+                className="bg-white text-gray-900 hover:bg-amber-100 font-black text-xs px-5 py-3 rounded-2xl shadow-xl transition transform hover:-translate-y-0.5"
               >
-                📐 Generate BOQ
+                📐 Generate BOQ Estimate
               </Link>
             </div>
           </div>
         </div>
 
-        {/* METRICS ROW */}
+        {/* PORTAL METRICS ROW */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Available Contracts</p>
-              <h3 className="text-2xl font-black text-gray-900 mt-1">128</h3>
-            </div>
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold">
-              📋
-            </div>
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Available Contracts</p>
+            <p className="text-2xl font-black text-amber-400 mt-1">128</p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Urgent Hiring</p>
-              <h3 className="text-2xl font-black text-amber-600 mt-1">14</h3>
-            </div>
-            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl font-bold">
-              🔥
-            </div>
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Urgent Hiring</p>
+            <p className="text-2xl font-black text-red-400 mt-1 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-red-400 rounded-full animate-ping" />
+              14 Requests
+            </p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">My Submitted Proposals</p>
-              <h3 className="text-2xl font-black text-gray-900 mt-1">5</h3>
-            </div>
-            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-xl font-bold">
-              🚀
-            </div>
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Submitted Proposals</p>
+            <p className="text-2xl font-black text-blue-400 mt-1">5 Bids</p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Avg. Project Budget</p>
-              <h3 className="text-2xl font-black text-emerald-600 mt-1">₦650,000</h3>
-            </div>
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold">
-              💰
-            </div>
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Avg. Contract Value</p>
+            <p className="text-2xl font-black text-green-400 mt-1">₦650,000</p>
           </div>
         </div>
 
         {/* SEARCH & CATEGORY FILTERS */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm space-y-4">
+        <div className="bg-gray-900/90 border border-gray-800 p-6 rounded-2xl shadow-2xl space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <span className="absolute left-4 top-3.5 text-gray-400">🔍</span>
+              <span className="absolute left-4 top-3.5 text-gray-500">🔍</span>
               <input
                 type="text"
                 placeholder="Search by trade, skill, or project keyword..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition"
+                className="w-full pl-11 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl focus:border-amber-500 text-white placeholder-gray-500 outline-none text-sm transition"
               />
             </div>
-            <select className="bg-gray-50 border border-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-medium outline-none">
+            <select className="bg-gray-950 border border-gray-800 text-gray-300 px-4 py-3 rounded-xl text-sm font-semibold outline-none focus:border-amber-500">
               <option>📍 All Locations (Lagos, Abuja...)</option>
               <option>Lagos Island</option>
               <option>Lagos Mainland</option>
@@ -151,10 +136,10 @@ export default function JobMarketplacePage() {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                className={`px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap ${
                   selectedCategory === cat
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                    : 'bg-gray-800/80 text-gray-400 hover:bg-gray-800 hover:text-white'
                 }`}
               >
                 {cat}
@@ -168,45 +153,45 @@ export default function JobMarketplacePage() {
           {JOBS_DATA.map((job) => (
             <div
               key={job.id}
-              className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-sm hover:shadow-md hover:border-blue-300 transition duration-200 group"
+              className="bg-gray-900/90 border border-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl space-y-4 hover:border-amber-500/40 transition duration-200 group"
             >
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="space-y-3 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-lg">
+                    <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30 uppercase">
                       {job.category}
                     </span>
                     {job.urgent && (
-                      <span className="bg-red-50 text-red-600 text-xs font-bold px-3 py-1 rounded-lg flex items-center gap-1">
+                      <span className="bg-red-500/20 text-red-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-red-500/30 uppercase flex items-center gap-1">
                         🔥 Urgent Need
                       </span>
                     )}
-                    <span className="text-xs text-gray-400 font-medium">• Posted {job.postedTime}</span>
+                    <span className="text-xs text-gray-400">• Posted {job.postedTime}</span>
                   </div>
 
-                  <h2 className="text-xl font-extrabold text-gray-900 group-hover:text-blue-600 transition">
+                  <h2 className="text-xl font-black text-white group-hover:text-amber-400 transition">
                     {job.title}
                   </h2>
 
-                  <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">
+                  <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">
                     {job.description}
                   </p>
 
-                  <div className="flex items-center gap-4 text-xs font-semibold text-gray-500 pt-1 flex-wrap">
-                    <span className="flex items-center gap-1">📍 {job.location}</span>
-                    <span className="flex items-center gap-1">
-                      👤 {job.client} {job.verifiedClient && <span className="text-blue-500" title="Verified Client">✓ Verified</span>}
+                  <div className="flex items-center gap-4 text-xs font-semibold text-gray-400 pt-1 flex-wrap">
+                    <span>📍 {job.location}</span>
+                    <span>
+                      👤 {job.client} {job.verifiedClient && <span className="text-blue-400" title="Verified">✓ Verified</span>}
                     </span>
-                    <span className="flex items-center gap-1">📩 {job.proposalsCount} Proposals</span>
+                    <span>📩 {job.proposalsCount} Proposals Submitted</span>
                   </div>
                 </div>
 
-                <div className="flex lg:flex-col justify-between items-end gap-3 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-100 min-w-[200px]">
+                <div className="flex lg:flex-col justify-between items-end gap-3 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-800 min-w-[200px]">
                   <div className="text-left lg:text-right">
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Project Budget</p>
-                    <p className="text-xl font-black text-emerald-600">{job.budget}</p>
+                    <p className="text-[10px] text-gray-400 uppercase font-bold">Estimated Budget</p>
+                    <p className="text-xl font-black text-amber-400">{job.budget}</p>
                   </div>
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition shadow-sm">
+                  <button className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs px-5 py-3 rounded-xl shadow-lg transition">
                     Submit Proposal
                   </button>
                 </div>
@@ -215,7 +200,7 @@ export default function JobMarketplacePage() {
           ))}
         </div>
 
-      </div>
+      </main>
     </div>
   );
 }
