@@ -33,6 +33,12 @@ export default function SettingsPage() {
 
       setUser(user)
 
+      // Load active mode from localStorage if available
+      const savedMode = localStorage.getItem('active_mode') as 'client' | 'artisan'
+      if (savedMode) {
+        setRole(savedMode)
+      }
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -40,7 +46,8 @@ export default function SettingsPage() {
         .single()
 
       if (profile) {
-        setRole(profile.role === 'artisan' ? 'artisan' : 'client')
+        const activeRole = savedMode || (profile.role === 'artisan' ? 'artisan' : 'client')
+        setRole(activeRole)
         setFullName(profile.full_name || '')
         setPhoneNumber(profile.phone_number || '')
         setCountry(user.user_metadata?.location || 'Ghana')
@@ -61,7 +68,7 @@ export default function SettingsPage() {
 
     // 1. Update user auth metadata (saves country)
     await supabase.auth.updateUser({
-      data: { location: country, full_name: fullName }
+      data: { location: country, full_name: fullName, role: role }
     })
 
     // 2. Update profiles table
@@ -84,18 +91,24 @@ export default function SettingsPage() {
     setUpdating(false)
   }
 
-  // Toggle Mode (Client <-> Artisan)
+  // 🔑 FIXED: Toggle Mode (Client <-> Artisan) with Instant Header Refresh
   const handleToggleRole = async (newRole: 'client' | 'artisan') => {
-    if (newRole === role || !user) return
+    if (!user) return
     setUpdating(true)
 
+    // 1. Save to Supabase
     await (supabase.from as any)('profiles').upsert({ id: user.id, role: newRole } as any)
     await supabase.auth.updateUser({ data: { role: newRole } })
 
+    // 2. Save active mode to localStorage
+    localStorage.setItem('active_mode', newRole)
     setRole(newRole)
+
     setMessage(`Switched to ${newRole === 'artisan' ? 'Artisan' : 'Client'} Mode!`)
     setUpdating(false)
-    router.refresh()
+
+    // 3. Force full browser reload so Navbar/Header updates view instantly!
+    window.location.reload()
   }
 
   // Handle Photo Upload
@@ -201,14 +214,14 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => handleToggleRole('client')}
                 disabled={updating}
-                className={`p-4 rounded-xl border text-left transition ${
+                className={`p-4 rounded-xl border text-left transition cursor-pointer ${
                   role === 'client'
                     ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-500'
                     : 'border-gray-200 hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-sm text-gray-900">Client Mode</span>
+                  <span className="font-bold text-sm text-gray-900">👤 Client Mode</span>
                   {role === 'client' && <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded font-bold">Active</span>}
                 </div>
                 <p className="text-xs text-gray-500">Post jobs, review proposals, and hire artisans.</p>
@@ -218,14 +231,14 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => handleToggleRole('artisan')}
                 disabled={updating}
-                className={`p-4 rounded-xl border text-left transition ${
+                className={`p-4 rounded-xl border text-left transition cursor-pointer ${
                   role === 'artisan'
                     ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-500'
                     : 'border-gray-200 hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-sm text-gray-900">Artisan Mode</span>
+                  <span className="font-bold text-sm text-gray-900">🛠️ Artisan Mode</span>
                   {role === 'artisan' && <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded font-bold">Active</span>}
                 </div>
                 <p className="text-xs text-gray-500">Browse job board, submit proposals, and showcase skills.</p>
@@ -276,7 +289,7 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={updating}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-sm cursor-pointer"
                 >
                   {updating ? 'Saving...' : 'Save Profile Changes'}
                 </button>
@@ -302,7 +315,7 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">ID Verification</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Upload official ID document to receive a verified badge.</p>
+              <p className="text-xs text-gray-500 mt-0.5">Upload official ID document (National ID / Passport) to earn a verified badge.</p>
             </div>
             <Link
               href="/verification"
@@ -317,4 +330,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
