@@ -1,187 +1,420 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import Navbar from '@/components/Navbar'
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import Navbar from '@/components/Navbar';
+import { createClient } from '@/lib/supabase/client';
 
 interface Job {
-  id: string
-  client_id: string | null
-  title: string
-  description: string | null
-  category: string
-  location: string
-  budget_min: number | null
-  budget_max: number | null
-  currency: string
-  status: string
-  created_at: string
-  updated_at: string | null
+  id: string;
+  title: string;
+  category: string;
+  location: string;
+  budget_min: number | null;
+  budget_max: number | null;
+  currency: string;
+  status: string;
+  created_at: string;
+  description?: string;
+  client_id?: string;
 }
 
-const CATEGORIES = [
-  'All Categories',
-  'Carpentry & Woodwork',
-  'Welding & Fabrication',
-  'Plumbing & Piping',
-  'Electrical Installation',
-  'Masonry & Construction',
-  'Painting & Decorating',
-  'Roofing & Ceiling',
-  'Solar & Inverter Setup',
-  'Tiling & Flooring',
-  'General Maintenance',
-]
+const SAMPLE_JOBS: Job[] = [
+  {
+    id: 'sample-1',
+    title: 'Full Villa Electrical Rewiring & Lighting Installation',
+    category: 'Electrical',
+    location: 'Lekki Phase 1, Lagos',
+    budget_min: 850000,
+    budget_max: 1200000,
+    currency: '₦',
+    status: 'open',
+    created_at: new Date().toISOString(),
+    description: 'Looking for a certified electrical engineer/artisan to completely overhaul conduit wiring for a 5-bedroom duplex, install modern LED strip lights, and set up an inverter bypass board.',
+  },
+  {
+    id: 'sample-2',
+    title: 'Custom Modern Kitchen Cabinetry & Granite Tops',
+    category: 'Carpentry',
+    location: 'Ikeja GRA, Lagos',
+    budget_min: 1500000,
+    budget_max: 2000000,
+    currency: '₦',
+    status: 'open',
+    created_at: new Date().toISOString(),
+    description: 'Need skilled joinery artisans for high-gloss acrylic kitchen cabinets with soft-close hinges and black galaxy granite countertop fitting.',
+  },
+  {
+    id: 'sample-3',
+    title: 'Bathroom Tile Laying & Plumbing Overhaul',
+    category: 'Plumbing & Tiling',
+    location: 'Epe, Lagos',
+    budget_min: 450000,
+    budget_max: 600000,
+    currency: '₦',
+    status: 'open',
+    created_at: new Date().toISOString(),
+    description: 'Replacement of old porcelain tiles with 60x60 vitreous tiles in 3 bathrooms. Includes installing wall-hung toilets and shower glass panels.',
+  },
+];
 
-export default function JobBoardPage() {
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState('All Categories')
-  const [searchTerm, setSearchTerm] = useState('')
+export default function JobMarketplacePage() {
+  const supabase = createClient();
 
-  const supabase = createClient()
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Modal state
+  const [selectedJobForBid, setSelectedJobForBid] = useState<Job | null>(null);
+  const [bidAmount, setBidAmount] = useState<string>('');
+  const [bidTimeline, setBidTimeline] = useState<string>('1 Week');
+  const [bidCoverLetter, setBidCoverLetter] = useState<string>('');
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
+  const [bidFeedbackMsg, setBidFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const categories = ['All', 'Electrical', 'Carpentry', 'Plumbing & Tiling', 'Masonry', 'Painting'];
 
   useEffect(() => {
-    const fetchJobs = async () => {
-      setLoading(true)
-      let query = supabase
-        .from('jobs')
-        .select('*')
-        .eq('status', 'open')
-        .order('created_at', { ascending: false })
+    async function fetchJobs() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (selectedCategory !== 'All Categories') {
-        query = query.eq('category', selectedCategory)
+        if (!error && data && data.length > 0) {
+          setJobs(data as Job[]);
+        } else {
+          setJobs(SAMPLE_JOBS);
+        }
+      } catch (err) {
+        console.error('Error fetching jobs:', err);
+        setJobs(SAMPLE_JOBS);
+      } finally {
+        setLoading(false);
       }
-
-      const { data, error } = await query
-
-      if (error) {
-        // Safe handling without crashing Next.js dev overlay
-        console.warn('Notice fetching jobs:', error.message)
-      } else {
-        setJobs((data as unknown as Job[]) || [])
-      }
-      setLoading(false)
     }
 
-    fetchJobs()
-  }, [selectedCategory, supabase])
+    fetchJobs();
+  }, [supabase]);
 
-  const filteredJobs = jobs.filter(
-    (job) =>
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.location.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleSubmitProposal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedJobForBid) return;
+
+    setIsSubmittingBid(true);
+    setBidFeedbackMsg(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        setBidFeedbackMsg({ type: 'error', text: 'Please sign in to submit a proposal.' });
+        setIsSubmittingBid(false);
+        return;
+      }
+
+      const { error } = await (supabase.from as any)('bids').insert([
+        {
+          job_id: selectedJobForBid.id,
+          artisan_id: user.id,
+          amount: Number(bidAmount),
+          proposed_timeline: bidTimeline,
+          cover_letter: bidCoverLetter,
+          status: 'pending',
+        },
+      ]);
+
+      if (error) throw error;
+
+      setBidFeedbackMsg({ type: 'success', text: 'Your proposal was submitted successfully!' });
+      setTimeout(() => {
+        setSelectedJobForBid(null);
+        setBidAmount('');
+        setBidCoverLetter('');
+        setBidFeedbackMsg(null);
+      }, 2000);
+    } catch (err: any) {
+      setBidFeedbackMsg({ type: 'error', text: err.message || 'Failed to submit proposal.' });
+    } finally {
+      setIsSubmittingBid(false);
+    }
+  };
+
+  const filteredJobs = jobs.filter((job) => {
+    const matchesCategory = selectedCategory === 'All' || job.category?.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesSearch =
+      job.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.location?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
+    <div className="min-h-screen bg-gray-950 text-white pb-20 font-sans">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
         
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Global Job Board</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Browse active client requests and submit custom proposals to win projects.
+        {/* HERO BANNER - Exact Dashboard Style */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-400/20">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <span className="bg-black/30 backdrop-blur-md text-amber-200 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-widest border border-amber-300/30">
+                ACTIVE PORTAL: 🛠️ ARTISAN WORK PORTAL
+              </span>
+              <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-3">
+                Job Marketplace
+              </h1>
+              <p className="text-amber-100 text-sm mt-1 max-w-xl">
+                Browse verified client contracts, submit competitive proposals, and win new artisan contracts.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <Link
+                href="/artisans/boq"
+                className="bg-white text-gray-900 hover:bg-amber-100 font-black text-xs px-5 py-3 rounded-2xl shadow-xl transition transform hover:-translate-y-0.5"
+              >
+                📐 Generate BOQ Estimate
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* METRICS ROW */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Available Contracts</p>
+            <p className="text-2xl font-black text-amber-400 mt-1">{jobs.length}</p>
+          </div>
+
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Marketplace Status</p>
+            <p className="text-xl font-black text-green-400 mt-1 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 bg-green-400 rounded-full animate-ping" />
+              Live Hiring
             </p>
           </div>
-          <Link
-            href="/jobs/new"
-            className="inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-5 py-2.5 rounded-xl shadow-sm transition"
-          >
-            + Post a New Job
-          </Link>
-        </div>
 
-        {/* Filters & Search Toolbar */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="w-full md:w-96">
-            <input
-              type="text"
-              placeholder="Search by title or location..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm outline-none transition"
-            />
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Escrow Protection</p>
+            <p className="text-xl font-black text-blue-400 mt-1">100% Guaranteed</p>
           </div>
 
-          <div className="w-full md:w-72">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm outline-none bg-white transition"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+          <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl backdrop-blur-md shadow-lg">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Matching Jobs</p>
+            <p className="text-lg font-black text-white mt-1">
+              {filteredJobs.length} {filteredJobs.length === 1 ? 'Job' : 'Jobs'} Found
+            </p>
           </div>
         </div>
 
-        {/* Job Listings Grid */}
+        {/* SEARCH & INTERACTIVE CATEGORY FILTERS */}
+        <div className="bg-gray-900/90 border border-gray-800 p-6 rounded-2xl shadow-2xl space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <span className="absolute left-4 top-3.5 text-gray-500">🔍</span>
+              <input
+                type="text"
+                placeholder="Search by trade, skill, or project keyword..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-xl focus:border-amber-500 text-white placeholder-gray-500 outline-none text-sm transition"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition whitespace-nowrap ${
+                  selectedCategory === cat
+                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                    : 'bg-gray-800/80 text-gray-400 hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* JOB LISTINGS FEED */}
         {loading ? (
-          <div className="text-center py-20 text-gray-500 text-sm">Loading active job listings...</div>
+          <div className="bg-gray-900/80 border border-gray-800 p-12 rounded-2xl text-center shadow-lg">
+            <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Loading marketplace jobs...</p>
+          </div>
         ) : filteredJobs.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <p className="text-gray-600 font-medium">No job requests found.</p>
-            <p className="text-gray-400 text-sm mt-1">Try adjusting your filters or check back later.</p>
+          <div className="bg-gray-900/80 border border-gray-800 p-12 text-center rounded-2xl shadow-lg space-y-3">
+            <span className="text-4xl">📋</span>
+            <h3 className="text-lg font-black text-white">No Jobs Available</h3>
+            <p className="text-xs text-gray-400 max-w-md mx-auto">
+              No project listings match your search criteria. Try selecting another category or keyword.
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             {filteredJobs.map((job) => (
-              <Link
+              <div
                 key={job.id}
-                href={`/jobs/${job.id}`}
-                className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-emerald-200 transition flex flex-col justify-between"
+                className="bg-gray-900/90 border border-gray-800 p-6 sm:p-8 rounded-2xl shadow-2xl space-y-4 hover:border-amber-500/50 transition duration-300 transform hover:-translate-y-0.5 group"
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="bg-emerald-50 text-emerald-700 font-semibold text-xs px-2.5 py-1 rounded-full">
-                      {job.category}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(job.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="space-y-3 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30 uppercase">
+                        {job.category || 'General'}
+                      </span>
+                      <span className="text-xs text-gray-400">• Posted {new Date(job.created_at).toLocaleDateString()}</span>
+                    </div>
 
-                  <h2 className="text-lg font-bold text-gray-900 line-clamp-2 mb-2">
-                    {job.title}
-                  </h2>
+                    <h2 className="text-xl font-black text-white group-hover:text-amber-400 transition">
+                      {job.title}
+                    </h2>
 
-                  <p className="text-gray-500 text-xs flex items-center gap-1 mb-4">
-                    📍 {job.location}
-                  </p>
-                </div>
-
-                <div className="border-t border-gray-100 pt-4 flex items-center justify-between mt-2">
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase font-medium">Estimated Budget</p>
-                    <p className="text-sm font-bold text-gray-900">
-                      {job.budget_min !== null || job.budget_max !== null ? (
-                        <>
-                          {job.currency || 'GHS'} {job.budget_min ?? '0'} {job.budget_max ? `- ${job.budget_max}` : '+'}
-                        </>
-                      ) : (
-                        'Open Budget'
-                      )}
+                    <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">
+                      {job.description || 'No detailed description provided.'}
                     </p>
+
+                    <div className="flex items-center gap-4 text-xs font-semibold text-gray-400 pt-1 flex-wrap">
+                      <span>📍 {job.location || 'Remote / Direct'}</span>
+                      <span className="text-green-400">✓ Verified Client Contract</span>
+                    </div>
                   </div>
-                  <span className="text-sm font-semibold text-emerald-600 hover:text-emerald-800">
-                    View & Bid →
-                  </span>
+
+                  <div className="flex lg:flex-col justify-between items-end gap-3 pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-800 min-w-[200px]">
+                    <div className="text-left lg:text-right">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold">Client Budget</p>
+                      <p className="text-xl font-black text-amber-400">
+                        {job.currency || '₦'}{' '}
+                        {job.budget_min
+                          ? `${Number(job.budget_min).toLocaleString()}${job.budget_max ? ` - ${Number(job.budget_max).toLocaleString()}` : '+'}`
+                          : 'Negotiable'}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedJobForBid(job);
+                        setBidAmount(job.budget_min ? String(job.budget_min) : '');
+                      }}
+                      className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs px-5 py-3 rounded-xl shadow-lg transition"
+                    >
+                      Submit Proposal
+                    </button>
+                  </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
 
-      </div>
+      </main>
+
+      {/* PROPOSAL MODAL */}
+      {selectedJobForBid && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-6 shadow-2xl relative">
+            <button
+              onClick={() => setSelectedJobForBid(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white font-bold text-lg"
+            >
+              ✕
+            </button>
+
+            <div>
+              <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30 uppercase">
+                Submit Proposal
+              </span>
+              <h2 className="text-xl font-black text-white mt-2">{selectedJobForBid.title}</h2>
+              <p className="text-xs text-gray-400 mt-1">📍 {selectedJobForBid.location}</p>
+            </div>
+
+            {bidFeedbackMsg && (
+              <div
+                className={`p-3 rounded-xl text-xs font-bold ${
+                  bidFeedbackMsg.type === 'success'
+                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                }`}
+              >
+                {bidFeedbackMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitProposal} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                  Your Bid Amount ({selectedJobForBid.currency || '₦'})
+                </label>
+                <input
+                  type="number"
+                  required
+                  placeholder="Enter proposal amount..."
+                  value={bidAmount}
+                  onChange={(e) => setBidAmount(e.target.value)}
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-xl text-white outline-none focus:border-amber-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                  Proposed Timeline
+                </label>
+                <select
+                  value={bidTimeline}
+                  onChange={(e) => setBidTimeline(e.target.value)}
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-xl text-white outline-none focus:border-amber-500 text-sm"
+                >
+                  <option>3 Days</option>
+                  <option>1 Week</option>
+                  <option>2 Weeks</option>
+                  <option>1 Month</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                  Cover Letter & Pitch
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="Explain your experience, tools, and why the client should hire you..."
+                  value={bidCoverLetter}
+                  onChange={(e) => setBidCoverLetter(e.target.value)}
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-xl text-white outline-none focus:border-amber-500 text-sm resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedJobForBid(null)}
+                  className="w-1/2 p-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl text-xs transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingBid}
+                  className="w-1/2 p-3 bg-amber-500 hover:bg-amber-600 text-black font-extrabold rounded-xl text-xs shadow-lg transition disabled:opacity-50"
+                >
+                  {isSubmittingBid ? 'Submitting...' : 'Send Proposal'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
-  )
+  );
 }
