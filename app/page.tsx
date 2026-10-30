@@ -23,7 +23,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-amber-50 dark:from-indigo-950/20 dark:via-[#05060f] dark:to-transparent" />
         <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-24 md:pt-28 md:pb-32">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-white/[0.06] border border-zinc-200 dark:border-white/10 text-xs">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> 1,200+ clients trust us in Ghana
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> 1,200+ clients trust us
           </div>
           <h1 className="mt-6 text-[42px] md:text-[72px] font-black tracking-tighter leading-[0.9]">
             Find <span className="text-indigo-600 dark:text-indigo-400">credible</span><br />artisans nearby.
@@ -53,9 +53,9 @@ export default function LandingPage() {
       <section className="max-w-7xl mx-auto px-6 pb-20">
         <div className="grid md:grid-cols-3 gap-4">
           {[
-            { Icon: MapPin, t: 'Nearby & Fast', d: 'Find artisans within 5km in Accra. Real-time availability.' },
+            { Icon: MapPin, t: 'Nearby & Fast', d: 'Find artisans within 5km in Area. Real-time availability.' },
             { Icon: MessageCircle, t: 'Chat + BOQ', d: 'Send photos, get Bill of Quantities before work starts.' },
-            { Icon: ShieldCheck, t: 'Verified & Safe', d: 'Ghana Card + skill verified. Payments protected.' },
+            { Icon: ShieldCheck, t: 'Verified & Safe', d: 'National ID Card + skill verified. Payments protected.' },
           ].map(({Icon, t, d}) => (
             <div key={t} className="p-6 rounded-[24px] bg-white dark:bg-white/[0.04] border border-zinc-200 dark:border-white/10">
               <div className="w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-black flex items-center justify-center"><Icon className="w-5 h-5" /></div>
