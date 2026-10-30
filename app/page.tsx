@@ -71,3 +71,4 @@ export default function LandingPage() {
       </footer>
     </main>
   );
+}
