@@ -1,9 +1,9 @@
-// components/boq/BoqView.tsx
 'use client';
 
 import React, { useState } from 'react';
 import { Boq, BoqStatus } from '@/types/boq';
 import { BoqStatusBadge } from './BoqStatusBadge';
+import { backend } from '@/lib/backend';
 
 interface Props {
   boq: Boq;
@@ -19,19 +19,12 @@ export const BoqView: React.FC<Props> = ({ boq, isClient = false }) => {
 
     setUpdating(true);
     try {
-      const response = await fetch(`/api/boq/${boq.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-
-      const res = await response.json();
-      if (!response.ok) throw new Error(res.error || 'Failed to update status');
+      await backend.update('boqs', boq.id, { status });
 
       setCurrentStatus(status);
       alert(`BOQ has been updated to ${status}.`);
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Failed to update status');
     } finally {
       setUpdating(false);
     }
