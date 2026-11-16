@@ -1,10 +1,9 @@
-// app/dashboard/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 import { InPageChatModal } from '@/components/chat/InPageChatModal'
 
@@ -34,6 +33,7 @@ interface Bid {
 }
 
 interface ArtisanProfile {
+  id?: string
   business_name?: string | null
   primary_skill?: string | null
   rating?: number | null
@@ -45,12 +45,12 @@ interface ArtisanProfile {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [userRole, setUserRole] = useState<string>('client')
   const [fullName, setFullName] = useState<string>('User')
+  const [profileRecordId, setProfileRecordId] = useState<string | null>(null)
 
   // Client states
   const [clientJobs, setClientJobs] = useState<Job[]>([])
@@ -73,193 +73,183 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       setLoading(true)
 
-      // 1. Get authenticated user
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      try {
+        // 1. Get authenticated user from custom backend
+        const { payload } = await backend.getMe()
+        const custom = (payload.custom as Record<string, any>) || {}
+        const userId = payload.sub as string
+        const defaultName = custom.full_name || 'Valued User'
+        const defaultRole = custom.account_type || (payload.role as string) || 'client'
 
-      if (userError || !user) {
-        if (isMounted) {
-          router.push('/login')
-        }
-        return
-      }
+        if (!isMounted) return
+        setUser({ id: userId, role: defaultRole, full_name: defaultName })
 
-      if (!isMounted) return
-      setUser(user)
+        // 2. Fetch or initialize user profile in custom backend 'profiles' collection
+        const profileRecords = await backend.list<any>('profiles')
+        let myProfile = profileRecords.find((p) => p.owner_id === userId || p.data?.user_id === userId)
 
-      // 2. Fetch user profile
-      let { data: profileData } = await supabase
-        .from('profiles')
-        .select('role, full_name')
-        .eq('id', user.id)
-        .single()
-
-      // ✅ FIX FOR GOOGLE OAUTH: If profile row doesn't exist, create it automatically!
-      if (!profileData) {
-        const googleName =
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.email?.split('@')[0] ||
-          'Valued User'
-        const googleRole = user.user_metadata?.role || 'client'
-
-        await (supabase.from as any)('profiles').upsert({
-          id: user.id,
-          full_name: googleName,
-          role: googleRole,
-        } as any)
-
-        profileData = { role: googleRole, full_name: googleName }
-      }
-
-      const role = profileData?.role || user.user_metadata?.role || 'client'
-      setUserRole(role)
-      setFullName(profileData?.full_name || 'Valued User')
-
-      // 3. If Artisan, fetch artisan profile and submitted bids
-      if (role === 'artisan') {
-        let { data: artProfile } = await supabase
-          .from('artisans')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-
-        // If Google user switched to Artisan, auto-create artisans table row if missing
-        if (!artProfile) {
-          await (supabase.from as any)('artisans').upsert({
-            id: user.id,
-            business_name: (profileData?.full_name || 'Artisan') + ' Services',
-            primary_skill: 'General Artisan',
-          } as any)
-
-          const { data: newArtProfile } = await supabase
-            .from('artisans')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-
-          artProfile = newArtProfile
+        if (!myProfile) {
+          myProfile = await backend.create<any>('profiles', {
+            user_id: userId,
+            role: defaultRole,
+            full_name: defaultName,
+          })
         }
 
-        if (artProfile && isMounted) {
-          setArtisanProfile(artProfile as unknown as ArtisanProfile)
-        }
+        if (!isMounted) return
+        setProfileRecordId(myProfile.id)
+        const role = myProfile.data?.role || defaultRole
+        const resolvedName = myProfile.data?.full_name || defaultName
+        setUserRole(role)
+        setFullName(resolvedName)
 
-        const { data: myBids, error: bidsError } = await supabase
-          .from('bids')
-          .select(`
-            *,
-            jobs:job_id (*)
-          `)
-          .eq('artisan_id', user.id)
-          .order('created_at', { ascending: false })
+        // 3. Load role-specific records
+        if (role === 'artisan') {
+          const artisanRecords = await backend.list<any>('artisans')
+          let myArtisan = artisanRecords.find((a) => a.owner_id === userId || a.data?.user_id === userId)
 
-        if (!bidsError && myBids && isMounted) {
-          setArtisanBids(myBids as unknown as Bid[])
-        }
-      } 
-      // 4. If Client, fetch posted jobs and incoming proposals
-      else {
-        const { data: userJobs, error: jobsError } = await supabase
-          .from('jobs')
-          .select('*')
-          .eq('client_id', user.id)
-          .order('created_at', { ascending: false })
+          if (!myArtisan) {
+            myArtisan = await backend.create<any>('artisans', {
+              user_id: userId,
+              business_name: `${resolvedName} Services`,
+              primary_skill: 'General Artisan',
+              rating: null,
+              jobs_completed: 0,
+              hourly_rate: null,
+            })
+          }
 
-        if (!jobsError && userJobs && isMounted) {
-          setClientJobs(userJobs as unknown as Job[])
+          if (isMounted) {
+            setArtisanProfile({ id: myArtisan.id, ...(myArtisan.data || {}) })
+          }
 
-          if (userJobs.length > 0) {
-            const jobIds = userJobs.map((j) => j.id)
-            const { data: bidsData } = await supabase
-              .from('bids')
-              .select(`
-                *,
-                artisans:artisan_id (
-                  business_name,
-                  primary_skill,
-                  rating,
-                  profiles:id (
-                    full_name,
-                    avatar_url
-                  )
-                )
-              `)
-              .in('job_id', jobIds)
-              .order('created_at', { ascending: false })
+          const allBids = await backend.list<any>('bids')
+          const allJobs = await backend.list<any>('jobs')
+          const jobMap = new Map(allJobs.map((j) => [j.id, { id: j.id, ...(j.data || {}), created_at: j.created_at }]))
 
-            if (bidsData && isMounted) {
-              const grouped: Record<string, any[]> = {}
-              bidsData.forEach((bid: any) => {
-                if (!grouped[bid.job_id]) grouped[bid.job_id] = []
-                grouped[bid.job_id].push(bid)
-              })
+          const myBids: Bid[] = allBids
+            .filter((b) => b.owner_id === userId || b.data?.artisan_id === userId)
+            .map((b) => ({
+              id: b.id,
+              ...(b.data || {}),
+              created_at: b.created_at,
+              jobs: jobMap.get(b.data?.job_id),
+            }))
+
+          if (isMounted) {
+            setArtisanBids(myBids)
+          }
+        } else {
+          const allJobs = await backend.list<any>('jobs')
+          const myJobs: Job[] = allJobs
+            .filter((j) => j.owner_id === userId || j.data?.client_id === userId)
+            .map((j) => ({
+              id: j.id,
+              ...(j.data || {}),
+              created_at: j.created_at,
+            }))
+
+          if (isMounted) {
+            setClientJobs(myJobs)
+          }
+
+          if (myJobs.length > 0) {
+            const jobIds = new Set(myJobs.map((j) => j.id))
+            const allBids = await backend.list<any>('bids')
+            const grouped: Record<string, any[]> = {}
+
+            allBids.forEach((b) => {
+              const jobId = b.data?.job_id
+              if (jobId && jobIds.has(jobId)) {
+                if (!grouped[jobId]) grouped[jobId] = []
+                grouped[jobId].push({
+                  id: b.id,
+                  ...(b.data || {}),
+                  created_at: b.created_at,
+                })
+              }
+            })
+
+            if (isMounted) {
               setBidsByJob(grouped)
             }
           }
         }
-      }
 
-      if (isMounted) {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
+      } catch {
+        if (isMounted) {
+          router.push('/login')
+        }
       }
     }
 
     fetchDashboardData()
 
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        router.push('/login')
-      }
-    })
-
     return () => {
       isMounted = false
-      authListener.subscription.unsubscribe()
     }
-  }, [router, supabase])
+  }, [router])
 
   // Instant Mode Switcher Handler
   const handleSwitchRole = async (newRole: 'client' | 'artisan') => {
+    if (!user) return
     setLoading(true)
 
-    await (supabase.from as any)('profiles').upsert({
-      id: user.id,
-      role: newRole,
-      full_name: fullName,
-    } as any)
+    try {
+      if (profileRecordId) {
+        await backend.update('profiles', profileRecordId, {
+          role: newRole,
+          full_name: fullName,
+        })
+      } else {
+        await backend.create('profiles', {
+          user_id: user.id,
+          role: newRole,
+          full_name: fullName,
+        })
+      }
 
-    if (newRole === 'artisan') {
-      await (supabase.from as any)('artisans').upsert({
-        id: user.id,
-        business_name: fullName + ' Trade Services',
-        primary_skill: 'General Artisan',
-      } as any)
+      if (newRole === 'artisan') {
+        const artisanRecords = await backend.list<any>('artisans')
+        const existingArtisan = artisanRecords.find((a) => a.owner_id === user.id || a.data?.user_id === user.id)
+        if (!existingArtisan) {
+          await backend.create('artisans', {
+            user_id: user.id,
+            business_name: `${fullName} Trade Services`,
+            primary_skill: 'General Artisan',
+          })
+        }
+      }
+
+      window.location.reload()
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to switch role.')
+      setLoading(false)
     }
-
-    await supabase.auth.updateUser({
-      data: { role: newRole }
-    })
-
-    window.location.reload()
   }
 
   // Open Live Chat directly inside the Portal Page
   const handleOpenLiveChat = async (artisanId: string, artisanName: string) => {
     try {
-      const { data: room, error } = await (supabase.from as any)('chat_rooms')
-        .upsert(
-          { artisan_id: artisanId, client_id: user.id },
-          { onConflict: 'artisan_id,client_id' }
-        )
-        .select('id')
-        .single()
+      const existingRooms = await backend.list<any>('chat_rooms')
+      let room = existingRooms.find(
+        (r) => r.data?.artisan_id === artisanId && r.data?.client_id === user.id
+      )
 
-      if (error) throw error
+      if (!room) {
+        room = await backend.create<any>('chat_rooms', {
+          artisan_id: artisanId,
+          artisan_name: artisanName,
+          client_id: user.id,
+        })
+      }
 
-      if (room) {
+      if (room?.id) {
         setRecipientName(artisanName)
-        setActiveRoomId(room.id) // Opens floating in-page chat modal
+        setActiveRoomId(room.id)
       }
     } catch (err: any) {
       alert('Failed to connect chat: ' + err.message)
@@ -270,57 +260,39 @@ export default function DashboardPage() {
     setActionLoading(bidId)
     setErrorMsg(null)
 
-    const { error: updateBidError } = await supabase
-      .from('bids')
-      .update({ status: newStatus })
-      .eq('id', bidId)
+    try {
+      await backend.update('bids', bidId, { status: newStatus })
 
-    if (updateBidError) {
-      setErrorMsg(updateBidError.message || 'Failed to update proposal.')
-      setActionLoading(null)
-      return
-    }
+      if (newStatus === 'accepted') {
+        await backend.update('jobs', jobId, { status: 'in_progress' })
 
-    if (newStatus === 'accepted') {
-      await (supabase.from as any)('jobs').update({ status: 'in_progress' }).eq('id', jobId)
-
-      const otherBids = (bidsByJob[jobId] || []).filter((b) => b.id !== bidId)
-      for (const other of otherBids) {
-        if (other.status === 'pending') {
-          await (supabase.from as any)('bids').update({ status: 'rejected' }).eq('id', other.id)
+        const otherBids = (bidsByJob[jobId] || []).filter((b) => b.id !== bidId)
+        for (const other of otherBids) {
+          if (other.status === 'pending') {
+            await backend.update('bids', other.id, { status: 'rejected' })
+          }
         }
       }
-    }
 
-    // Refresh client bids
-    const { data: refreshedBids } = await supabase
-      .from('bids')
-      .select(`
-        *,
-        artisans:artisan_id (
-          business_name,
-          primary_skill,
-          rating,
-          profiles:id (
-            full_name,
-            avatar_url
-          )
+      // Update local UI state cleanly
+      const updatedJobBids = (bidsByJob[jobId] || []).map((b) => {
+        if (b.id === bidId) return { ...b, status: newStatus }
+        if (newStatus === 'accepted' && b.status === 'pending') return { ...b, status: 'rejected' }
+        return b
+      })
+
+      setBidsByJob({ ...bidsByJob, [jobId]: updatedJobBids })
+
+      if (newStatus === 'accepted') {
+        setClientJobs(
+          clientJobs.map((j) => (j.id === jobId ? { ...j, status: 'in_progress' } : j))
         )
-      `)
-      .eq('job_id', jobId)
-
-    if (refreshedBids) {
-      setBidsByJob({ ...bidsByJob, [jobId]: refreshedBids })
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to update proposal.')
+    } finally {
+      setActionLoading(null)
     }
-
-    const { data: refreshedJobs } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('client_id', user.id)
-      .order('created_at', { ascending: false })
-
-    if (refreshedJobs) setClientJobs(refreshedJobs as unknown as Job[])
-    setActionLoading(null)
   }
 
   if (loading) {
@@ -340,7 +312,6 @@ export default function DashboardPage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        
         {/* HERO ROLE SWITCHER BANNER */}
         <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-400/20">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -368,7 +339,7 @@ export default function DashboardPage() {
 
               {userRole === 'artisan' ? (
                 <Link
-                  href="/artisans/boq"
+                  href="/artisan/boq"
                   className="bg-black/40 hover:bg-black/60 border border-white/20 text-white font-bold text-xs px-5 py-3 rounded-2xl shadow transition"
                 >
                   📐 Generate BOQ Estimate
@@ -428,8 +399,6 @@ export default function DashboardPage() {
         {/* ================= ARTISAN PORTAL CONTENT ================= */}
         {userRole === 'artisan' ? (
           <div className="space-y-8">
-            
-            {/* Quick Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-gray-900/80 border border-gray-800 p-5 rounded-2xl">
                 <p className="text-xs text-gray-400 uppercase font-bold">Primary Skill</p>
@@ -479,7 +448,7 @@ export default function DashboardPage() {
               <h2 className="text-xl font-bold text-white mb-4">Your Submitted Proposals ({artisanBids.length})</h2>
               {artisanBids.length === 0 ? (
                 <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-10 text-center space-y-3">
-                  <p className="text-gray-400 text-sm">You haven't submitted any proposals yet.</p>
+                  <p className="text-gray-400 text-sm">You haven&apos;t submitted any proposals yet.</p>
                   <Link href="/jobs" className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs px-5 py-3 rounded-xl transition">
                     Explore Job Board
                   </Link>
@@ -514,7 +483,6 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-
           </div>
         ) : (
           /* ================= CLIENT PORTAL CONTENT ================= */
@@ -523,7 +491,7 @@ export default function DashboardPage() {
 
             {clientJobs.length === 0 ? (
               <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-10 text-center space-y-3">
-                <p className="text-gray-400 text-sm">You haven't posted any jobs yet. Create a job request to receive proposals from global artisans.</p>
+                <p className="text-gray-400 text-sm">You haven&apos;t posted any jobs yet. Create a job request to receive proposals from global artisans.</p>
                 <Link href="/jobs/new" className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs px-5 py-3 rounded-xl transition">
                   Post Your First Job
                 </Link>
@@ -564,7 +532,7 @@ export default function DashboardPage() {
                           bids.map((bid) => {
                             const artisan = bid.artisans
                             const profile = artisan?.profiles
-                            const artisanName = profile?.full_name || artisan?.business_name || 'Professional Artisan'
+                            const artisanName = bid.artisan_name || profile?.full_name || artisan?.business_name || 'Professional Artisan'
 
                             return (
                               <div key={bid.id} className="bg-gray-800/50 border border-gray-700/60 rounded-xl p-4 sm:p-5 space-y-3">
@@ -582,7 +550,6 @@ export default function DashboardPage() {
                                   <div className="flex items-center gap-3">
                                     <span className="text-base font-black text-amber-400">{job.currency} {bid.amount}</span>
 
-                                    {/* In-Page Live Chat Button */}
                                     <button
                                       onClick={() => handleOpenLiveChat(bid.artisan_id, artisanName)}
                                       className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow transition flex items-center gap-1"
@@ -624,7 +591,6 @@ export default function DashboardPage() {
             )}
           </div>
         )}
-
       </main>
 
       {/* FLOATING IN-PAGE CHAT & VIDEO CALL DRAWER */}
