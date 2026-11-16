@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 interface Artisan {
   id: string
+  recordId?: string
   full_name: string
   skills: string[] | string | null
   location: string
@@ -20,6 +20,13 @@ interface Artisan {
   role?: string | null
   client_company?: string | null
   client_phone?: string | null
+}
+
+interface CurrentUser {
+  id: string
+  email?: string
+  full_name?: string
+  role?: string
 }
 
 const SKILLS = [
@@ -43,7 +50,8 @@ export default function ArtisanDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   // Current User & Role States
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<CurrentUser | null>(null)
+  const [userProfileRecordId, setUserProfileRecordId] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<'artisan' | 'client'>('artisan')
   const [switchingRole, setSwitchingRole] = useState(false)
 
@@ -63,55 +71,114 @@ export default function ArtisanDirectoryPage() {
   const [clientPhone, setClientPhone] = useState<string>('')
 
   const router = useRouter()
-  const supabase = createClient()
+
+  const loadProfilesList = async () => {
+    try {
+      const records = await backend.list<any>('profiles')
+      const mapped: Artisan[] = records.map((r) => {
+        const d = r.data || {}
+        return {
+          id: d.user_id || r.id,
+          recordId: r.id,
+          full_name: d.full_name || 'Unnamed Artisan',
+          skills: d.skills || null,
+          location: d.location || 'Cape Coast',
+          hourly_rate: d.hourly_rate ?? null,
+          rating: d.rating ?? null,
+          bio: d.bio || null,
+          avatar_url: d.avatar_url || null,
+          is_available: d.is_available ?? true,
+          role: d.role || 'artisan',
+          client_company: d.client_company || null,
+          client_phone: d.client_phone || null,
+        }
+      })
+      mapped.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+      setArtisans(mapped)
+      return records
+    } catch (err) {
+      console.warn('Notice fetching artisans:', err)
+      return []
+    }
+  }
 
   useEffect(() => {
     const fetchSessionAndData = async () => {
       setLoading(true)
 
-      // 1. Check logged-in user session
-      const { data: { session } } = await supabase.auth.getSession()
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
+      let loggedInUser: CurrentUser | null = null
+      try {
+        const { payload } = await backend.getMe()
+        const custom = (payload.custom as Record<string, any>) || {}
+        loggedInUser = {
+          id: payload.sub as string,
+          full_name: custom.full_name || 'User',
+          role: custom.account_type || (payload.role as string) || 'artisan',
+        }
+        setUser(loggedInUser)
+      } catch {
+        setUser(null)
+      }
 
-      if (currentUser) {
-        // Fetch specific profile data
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .single()
+      const records = await loadProfilesList()
 
-        if (profileData) {
-          const typedProfile = profileData as unknown as Artisan
-          const activeRole = typedProfile.role === 'client' ? 'client' : 'artisan'
+      if (loggedInUser) {
+        const existingRecord = records.find(
+          (r: any) => r.data?.user_id === loggedInUser!.id || r.owner_id === loggedInUser!.id
+        )
+
+        if (existingRecord) {
+          setUserProfileRecordId(existingRecord.id)
+          const d = existingRecord.data || {}
+          const activeRole = d.role === 'client' ? 'client' : 'artisan'
           setUserRole(activeRole)
-          setIsAvailable(typedProfile.is_available ?? true)
-          setHourlyRate(typedProfile.hourly_rate ? typedProfile.hourly_rate.toString() : '')
-          setBio(typedProfile.bio || '')
-          setClientCompany(typedProfile.client_company || '')
-          setClientPhone(typedProfile.client_phone || '')
+          setIsAvailable(d.is_available ?? true)
+          setHourlyRate(d.hourly_rate ? d.hourly_rate.toString() : '')
+          setBio(d.bio || '')
+          setClientCompany(d.client_company || '')
+          setClientPhone(d.client_phone || '')
+        } else {
+          // Initialize a profile record in custom backend if none exists yet
+          try {
+            const initialRole = loggedInUser.role === 'client' ? 'client' : 'artisan'
+            const created = await backend.create<any>('profiles', {
+              user_id: loggedInUser.id,
+              full_name: loggedInUser.full_name || 'User',
+              role: initialRole,
+              is_available: true,
+            })
+            setUserProfileRecordId(created.id)
+            setUserRole(initialRole)
+            await loadProfilesList()
+          } catch (createErr) {
+            console.warn('Could not initialize profile record:', createErr)
+          }
         }
       }
 
-      // 2. Fetch all artisans for the directory
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name', { ascending: true })
-
-      if (error) {
-        console.warn('Notice fetching artisans:', error.message)
-      } else {
-        setArtisans((data as unknown as Artisan[]) || [])
-      }
       setLoading(false)
     }
 
     fetchSessionAndData()
-  }, [supabase])
+  }, [])
 
-  // Handle Mode Switch (Artisan <-> Client) with immediate router refresh
+  const upsertUserProfile = async (updates: Record<string, unknown>) => {
+    if (!user) throw new Error('Not authenticated')
+
+    if (userProfileRecordId) {
+      await backend.update('profiles', userProfileRecordId, updates)
+    } else {
+      const created = await backend.create<any>('profiles', {
+        user_id: user.id,
+        full_name: user.full_name || 'User',
+        role: userRole,
+        ...updates,
+      })
+      setUserProfileRecordId(created.id)
+    }
+  }
+
+  // Handle Mode Switch (Artisan <-> Client)
   const handleToggleRole = async () => {
     if (!user) {
       router.push('/login')
@@ -121,25 +188,22 @@ export default function ArtisanDirectoryPage() {
     setSwitchingRole(true)
     const newRole = userRole === 'artisan' ? 'client' : 'artisan'
 
-    // Update in Supabase profiles table
-    const { error } = await ((supabase.from as any)('profiles') as any)
-      .update({ role: newRole })
-      .eq('id', user.id)
-
-    if (!error) {
+    try {
+      await upsertUserProfile({ role: newRole })
       setUserRole(newRole)
       setIsSettingsOpen(false)
       setIsClientSettingsOpen(false)
       router.refresh()
-    } else {
-      console.error('Failed to switch role:', error.message)
+    } catch (err: any) {
+      console.error('Failed to switch role:', err.message)
+    } finally {
+      setSwitchingRole(false)
     }
-    setSwitchingRole(false)
   }
 
   // Handle Logout action
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await backend.logout()
     setUser(null)
     router.push('/login')
   }
@@ -152,22 +216,19 @@ export default function ArtisanDirectoryPage() {
     setSavingSettings(true)
     setSettingsMsg(null)
 
-    const { error } = await ((supabase.from as any)('profiles') as any)
-      .update({
+    try {
+      await upsertUserProfile({
         is_available: isAvailable,
         hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
         bio: bio.trim(),
       })
-      .eq('id', user.id)
-
-    if (error) {
-      setSettingsMsg('Failed to update settings: ' + error.message)
-    } else {
       setSettingsMsg('Settings updated successfully!')
-      const { data } = await (supabase.from as any)('profiles').select('*').order('full_name', { ascending: true })
-      if (data) setArtisans(data as unknown as Artisan[])
+      await loadProfilesList()
+    } catch (err: any) {
+      setSettingsMsg('Failed to update settings: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSavingSettings(false)
     }
-    setSavingSettings(false)
   }
 
   // Handle Client Quick-Settings Form Save
@@ -178,19 +239,17 @@ export default function ArtisanDirectoryPage() {
     setSavingClientSettings(true)
     setClientSettingsMsg(null)
 
-    const { error } = await ((supabase.from as any)('profiles') as any)
-      .update({
+    try {
+      await upsertUserProfile({
         client_company: clientCompany.trim(),
         client_phone: clientPhone.trim(),
       })
-      .eq('id', user.id)
-
-    if (error) {
-      setClientSettingsMsg('Failed to update client settings: ' + error.message)
-    } else {
       setClientSettingsMsg('Client settings updated successfully!')
+    } catch (err: any) {
+      setClientSettingsMsg('Failed to update client settings: ' + (err.message || 'Unknown error'))
+    } finally {
+      setSavingClientSettings(false)
     }
-    setSavingClientSettings(false)
   }
 
   const filteredArtisans = artisans.filter((artisan) => {
@@ -524,4 +583,3 @@ export default function ArtisanDirectoryPage() {
     </div>
   )
 }
-
