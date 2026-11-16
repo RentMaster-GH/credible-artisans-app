@@ -1,35 +1,57 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Boq } from '@/types/boq';
 import { BoqStatusBadge } from '@/components/boq/BoqStatusBadge';
+import { backend } from '@/lib/backend';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 
 export default function ArtisanBoqListPage() {
+  const router = useRouter();
   const [boqs, setBoqs] = useState<Boq[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Replace with actual artisan ID from auth session
-  const artisanId = "YOUR_LOGGED_IN_ARTISAN_ID"; 
-
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchBoqs() {
       try {
-        const res = await fetch(`/api/boq?artisanId=${artisanId}`);
-        const json = await res.json();
-        if (json.success) {
-          setBoqs(json.data || []);
+        // Verify active session via custom backend
+        const { payload } = await backend.getMe();
+        const artisanId = payload.sub;
+
+        // Fetch BOQs created by this artisan from custom backend collection
+        const records = await backend.list<any>('boqs');
+        const userBoqs: Boq[] = records
+          .filter((r) => r.owner_id === artisanId || r.data?.artisan_id === artisanId)
+          .map((r) => ({
+            id: r.id,
+            ...(r.data || {}),
+          }));
+
+        if (isMounted) {
+          setBoqs(userBoqs);
         }
       } catch (err) {
-        console.error('Failed to load BOQs:', err);
+        console.error('Auth or BOQ fetch failed:', err);
+        if (isMounted) {
+          router.push('/login');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
+
     fetchBoqs();
-  }, [artisanId]);
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   // Dynamic Statistics
   const totalBoqs = boqs.length;
@@ -53,7 +75,6 @@ export default function ArtisanBoqListPage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        
         {/* HERO ROLE BANNER */}
         <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-400/20">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -190,7 +211,6 @@ export default function ArtisanBoqListPage() {
             </div>
           </div>
         )}
-
       </main>
     </div>
   );
