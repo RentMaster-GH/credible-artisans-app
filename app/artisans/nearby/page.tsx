@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 interface ArtisanProfile {
@@ -45,8 +45,6 @@ export default function NearbyArtisansPage() {
   const [selectedDistrict, setSelectedDistrict] = useState('Cape Coast')
   const [searchMethod, setSearchMethod] = useState<'gps' | 'district'>('district')
 
-  const supabase = createClient()
-
   // Default to Cape Coast coordinates on initial load
   useEffect(() => {
     handleDistrictChange('Cape Coast')
@@ -68,7 +66,7 @@ export default function NearbyArtisansPage() {
         setUserLocation({ lat, lng })
         fetchAndSortArtisans(lat, lng)
       },
-      (error) => {
+      () => {
         alert('Unable to retrieve your location. Please select a district instead.')
         setLoading(false)
       }
@@ -87,25 +85,29 @@ export default function NearbyArtisansPage() {
 
   const fetchAndSortArtisans = async (refLat: number, refLng: number) => {
     setLoading(true)
-    const { data, error } = await (supabase.from as any)('profiles').select('*')
+    try {
+      const records = await backend.list<any>('profiles')
 
-    if (!error && data) {
-      const processed: ArtisanProfile[] = (data as any[]).map((artisan) => {
+      const processed: ArtisanProfile[] = records.map((record) => {
+        const data = record.data || {}
+        const profileId = data.user_id || record.id
         let distance = 0
-        if (artisan.latitude && artisan.longitude) {
-          distance = calculateDistance(refLat, refLng, artisan.latitude, artisan.longitude)
+
+        if (data.latitude && data.longitude) {
+          distance = calculateDistance(refLat, refLng, Number(data.latitude), Number(data.longitude))
         } else {
-          // Mock arbitrary distance if coordinates aren't set yet
+          // Fallback arbitrary distance if coordinates aren't set yet
           distance = Math.floor(Math.random() * 15) + 1
         }
+
         return {
-          id: artisan.id,
-          full_name: artisan.full_name,
-          skills: artisan.skills || null,
-          location: artisan.location || null,
-          hourly_rate: artisan.hourly_rate || null,
-          latitude: artisan.latitude,
-          longitude: artisan.longitude,
+          id: profileId,
+          full_name: data.full_name || 'Unnamed Artisan',
+          skills: data.skills || null,
+          location: data.location || null,
+          hourly_rate: data.hourly_rate || null,
+          latitude: data.latitude || null,
+          longitude: data.longitude || null,
           distance,
         }
       })
@@ -113,8 +115,12 @@ export default function NearbyArtisansPage() {
       // Sort by closest proximity
       processed.sort((a, b) => (a.distance || 0) - (b.distance || 0))
       setArtisans(processed)
+    } catch (err) {
+      console.error('Error fetching nearby artisans:', err)
+      setArtisans([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -228,4 +234,3 @@ export default function NearbyArtisansPage() {
     </div>
   )
 }
-
