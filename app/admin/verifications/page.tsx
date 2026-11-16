@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 interface VerificationRequest {
@@ -20,36 +20,47 @@ export default function AdminVerificationsPage() {
   const [loading, setLoading] = useState(true)
   const [authorized, setAuthorized] = useState(false)
 
-  const supabase = createClient()
-
   useEffect(() => {
     const verifyAndFetch = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      try {
+        const { payload } = await backend.getMe()
+        const userEmail = (payload.email as string) || ''
 
-      if (!user || user.email !== DEVELOPER_EMAIL) {
+        if (userEmail !== DEVELOPER_EMAIL && payload.role !== 'admin') {
+          setAuthorized(false)
+          setLoading(false)
+          return
+        }
+
+        setAuthorized(true)
+        await fetchVerifications()
+      } catch {
         setAuthorized(false)
         setLoading(false)
-        return
       }
-
-      setAuthorized(true)
-      fetchVerifications()
     }
 
     verifyAndFetch()
-  }, [supabase])
+  }, [])
 
   const fetchVerifications = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('verifications')
-      .select('*')
-      .order('submitted_at', { ascending: false })
-
-    if (!error && data) {
-      setRequests(data as VerificationRequest[])
+    try {
+      const records = await backend.list<any>('verifications')
+      const formatted: VerificationRequest[] = records.map((r) => ({
+        id: r.id,
+        id_document_url: r.data?.id_document_url || '',
+        id_type: r.data?.id_type || 'ID Document',
+        status: r.data?.status || 'pending',
+        submitted_at: r.data?.submitted_at || r.created_at,
+        user_id: r.data?.user_id || r.owner_id || null,
+      }))
+      setRequests(formatted)
+    } catch (err) {
+      console.error('Error fetching verifications:', err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const approveUserVerification = async (userId: string | null, verificationId: string) => {
@@ -58,22 +69,21 @@ export default function AdminVerificationsPage() {
       return
     }
 
-    // 1. Mark verification request as verified
-    await supabase
-      .from('verifications')
-      .update({ status: 'verified' })
-      .eq('id', verificationId)
+    try {
+      // 1. Mark verification request as verified
+      await backend.update('verifications', verificationId, { status: 'verified' })
 
-    // 2. Set is_verified = true on their profiles row
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_verified: true })
-      .eq('id', userId)
+      // 2. Find matching profile record and set is_verified = true
+      const profiles = await backend.list<any>('profiles')
+      const targetProfile = profiles.find((p) => p.owner_id === userId || p.data?.user_id === userId)
 
-    if (error) {
-      alert('Error updating profile: ' + error.message)
-    } else {
-      fetchVerifications()
+      if (targetProfile) {
+        await backend.update('profiles', targetProfile.id, { is_verified: true })
+      }
+
+      await fetchVerifications()
+    } catch (err: any) {
+      alert('Error updating verification: ' + (err.message || 'Unknown error'))
     }
   }
 
@@ -117,7 +127,11 @@ export default function AdminVerificationsPage() {
                 <div key={req.id} className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="flex items-center gap-4 w-full md:w-auto">
                     <a href={req.id_document_url} target="_blank" rel="noopener noreferrer">
-                      <img src={req.id_document_url} alt="ID Document" className="w-24 h-20 rounded-xl object-cover border border-gray-200 hover:opacity-90 transition" />
+                      <img
+                        src={req.id_document_url}
+                        alt="ID Document"
+                        className="w-24 h-20 rounded-xl object-cover border border-gray-200 hover:opacity-90 transition"
+                      />
                     </a>
                     <div>
                       <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
@@ -129,9 +143,11 @@ export default function AdminVerificationsPage() {
                   </div>
 
                   <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                    <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg uppercase ${
-                      req.status === 'verified' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-700'
-                    }`}>
+                    <span
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg uppercase ${
+                        req.status === 'verified' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-700'
+                      }`}
+                    >
                       {req.status}
                     </span>
 
