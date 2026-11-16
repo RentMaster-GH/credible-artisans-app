@@ -398,18 +398,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     required
+                    autoComplete="new-password"
                     value={confirmPassword}
-                    onChange={(e) => setShowConfirmPassword(!showConfirmPassword)}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full border border-gray-300 rounded-xl p-3 text-sm pr-10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    className="relative z-10 w-full border border-gray-300 rounded-xl p-3 text-sm pr-10 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-base focus:outline-none p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-20 text-gray-400 hover:text-gray-700 text-base focus:outline-none p-1"
                   >
                     {showConfirmPassword ? '🙈' : '👁️'}
                   </button>
+
                 </div>
               </div>
             )}
