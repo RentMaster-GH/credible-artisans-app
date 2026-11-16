@@ -3,115 +3,130 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 import { WORLD_COUNTRIES } from '@/lib/countries'
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
+  const [profileRecordId, setProfileRecordId] = useState<string | null>(null)
   const [role, setRole] = useState<'client' | 'artisan'>('client')
   const [fullName, setFullName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [country, setCountry] = useState('Ghana')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  
+
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      try {
+        const { payload } = await backend.getMe()
+        const uid = payload.sub as string
+        const custom = (payload.custom as Record<string, any>) || {}
+        setUser({ id: uid })
+
+        const savedMode = localStorage.getItem('active_mode') as 'client' | 'artisan' | null
+        if (savedMode) {
+          setRole(savedMode)
+        }
+
+        const profiles = await backend.list<any>('profiles')
+        const existing = profiles.find((p) => (p.data?.user_id || p.owner_id) === uid)
+
+        if (existing) {
+          setProfileRecordId(existing.id)
+          const d = existing.data || {}
+          const activeRole =
+            savedMode || (d.role === 'artisan' ? 'artisan' : custom.account_type || 'client')
+          setRole(activeRole)
+          setFullName(d.full_name || custom.full_name || '')
+          setPhoneNumber(d.phone_number || '')
+          setCountry(d.location || 'Ghana')
+          setAvatarUrl(d.avatar_url || null)
+        } else {
+          setFullName(custom.full_name || '')
+          setRole(savedMode || custom.account_type || 'client')
+        }
+      } catch {
         router.push('/login')
         return
+      } finally {
+        setLoading(false)
       }
-
-      setUser(user)
-
-      // Load active mode from localStorage if available
-      const savedMode = localStorage.getItem('active_mode') as 'client' | 'artisan'
-      if (savedMode) {
-        setRole(savedMode)
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (profile) {
-        const activeRole = savedMode || (profile.role === 'artisan' ? 'artisan' : 'client')
-        setRole(activeRole)
-        setFullName(profile.full_name || '')
-        setPhoneNumber(profile.phone_number || '')
-        setCountry(user.user_metadata?.location || 'Ghana')
-        setAvatarUrl(profile.avatar_url || null)
-      }
-      setLoading(false)
     }
 
     fetchUserData()
-  }, [router, supabase])
+  }, [router])
 
-  // Save General Profile Details
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) return
+
     setUpdating(true)
     setMessage(null)
     setErrorMsg(null)
 
-    // 1. Update user auth metadata (saves country)
-    await supabase.auth.updateUser({
-      data: { location: country, full_name: fullName, role: role }
-    })
-
-    // 2. Update profiles table
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: user.id,
-        full_name: fullName,
-        role: role,
-        phone_number: phoneNumber,
+    try {
+      const payload = {
+        user_id: user.id,
+        full_name: fullName.trim(),
+        role,
+        phone_number: phoneNumber.trim(),
+        location: country,
         avatar_url: avatarUrl,
-      } as any)
+      }
 
-    if (error) {
-      setErrorMsg(error.message)
-    } else {
+      if (profileRecordId) {
+        await backend.update('profiles', profileRecordId, payload)
+      } else {
+        const created = await backend.create<any>('profiles', payload)
+        setProfileRecordId(created.id)
+      }
+
+      localStorage.setItem('active_mode', role)
       setMessage('Profile settings updated successfully!')
       router.refresh()
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to update profile settings.')
+    } finally {
+      setUpdating(false)
     }
-    setUpdating(false)
   }
 
-  // 🔑 FIXED: Toggle Mode (Client <-> Artisan) with Instant Header Refresh
   const handleToggleRole = async (newRole: 'client' | 'artisan') => {
     if (!user) return
     setUpdating(true)
+    setErrorMsg(null)
 
-    // 1. Save to Supabase
-    await (supabase.from as any)('profiles').upsert({ id: user.id, role: newRole } as any)
-    await supabase.auth.updateUser({ data: { role: newRole } })
+    try {
+      if (profileRecordId) {
+        await backend.update('profiles', profileRecordId, { role: newRole })
+      } else {
+        const created = await backend.create<any>('profiles', {
+          user_id: user.id,
+          full_name: fullName || 'User',
+          role: newRole,
+        })
+        setProfileRecordId(created.id)
+      }
 
-    // 2. Save active mode to localStorage
-    localStorage.setItem('active_mode', newRole)
-    setRole(newRole)
-
-    setMessage(`Switched to ${newRole === 'artisan' ? 'Artisan' : 'Client'} Mode!`)
-    setUpdating(false)
-
-    // 3. Force full browser reload so Navbar/Header updates view instantly!
-    window.location.reload()
+      localStorage.setItem('active_mode', newRole)
+      setRole(newRole)
+      setMessage(`Switched to ${newRole === 'artisan' ? 'Artisan' : 'Client'} Mode!`)
+      window.location.reload()
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to switch mode.')
+    } finally {
+      setUpdating(false)
+    }
   }
 
-  // Handle Photo Upload
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -123,17 +138,17 @@ export default function SettingsPage() {
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      const result = reader.result as string
-      setAvatarUrl(result)
+      setAvatarUrl(reader.result as string)
     }
     reader.readAsDataURL(file)
   }
 
-  // Delete / Remove Profile Picture
   const handleDeleteAvatar = async () => {
     if (!confirm('Are you sure you want to remove your profile picture?')) return
     setAvatarUrl(null)
-    await (supabase.from as any)('profiles').update({ avatar_url: null } as any).eq('id', user.id)
+    if (profileRecordId) {
+      await backend.update('profiles', profileRecordId, { avatar_url: null }).catch(() => {})
+    }
     setMessage('Profile picture removed.')
   }
 
@@ -152,7 +167,9 @@ export default function SettingsPage() {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Account Settings</h1>
-        <p className="text-gray-500 text-sm mb-8">Manage your profile details, photo, mode switcher, and support tickets.</p>
+        <p className="text-gray-500 text-sm mb-8">
+          Manage your profile details, photo, mode switcher, and support tickets.
+        </p>
 
         {message && (
           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl font-medium">
@@ -167,7 +184,6 @@ export default function SettingsPage() {
         )}
 
         <div className="space-y-6">
-          
           {/* 1. Profile Picture Management Card */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-base font-bold text-gray-900 mb-4">Profile Picture</h2>
@@ -222,7 +238,9 @@ export default function SettingsPage() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-sm text-gray-900">👤 Client Mode</span>
-                  {role === 'client' && <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded font-bold">Active</span>}
+                  {role === 'client' && (
+                    <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded font-bold">Active</span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500">Post jobs, review proposals, and hire artisans.</p>
               </button>
@@ -239,7 +257,9 @@ export default function SettingsPage() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-sm text-gray-900">🛠️ Artisan Mode</span>
-                  {role === 'artisan' && <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded font-bold">Active</span>}
+                  {role === 'artisan' && (
+                    <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded font-bold">Active</span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500">Browse job board, submit proposals, and showcase skills.</p>
               </button>
@@ -280,7 +300,9 @@ export default function SettingsPage() {
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none bg-white focus:ring-2 focus:ring-indigo-500"
                 >
                   {WORLD_COUNTRIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -301,7 +323,9 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Customer Support & Suggestions</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Submit complaints, technical issues, or platform feedback.</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Submit complaints, technical issues, or platform feedback.
+              </p>
             </div>
             <Link
               href="/support"
@@ -315,7 +339,9 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">ID Verification</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Upload official ID document (National ID / Passport) to earn a verified badge.</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Upload official ID document (National ID / Passport) to earn a verified badge.
+              </p>
             </div>
             <Link
               href="/verification"
@@ -324,7 +350,6 @@ export default function SettingsPage() {
               Verify Account →
             </Link>
           </div>
-
         </div>
       </div>
     </div>
