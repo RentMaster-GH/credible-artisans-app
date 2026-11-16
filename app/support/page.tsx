@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 export default function SupportPage() {
@@ -12,33 +12,29 @@ export default function SupportPage() {
   const [submitted, setSubmitted] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const supabase = createClient()
-
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+      // Submit directly to your custom backend's 'customer_support' collection
+      await backend.create('customer_support', {
+        ticket_type: category,
+        category,
+        subject,
+        message,
+        status: 'open',
+      })
 
-    // Submit to customer_support table
-    const { error } = await (supabase.from as any)('customer_support').insert({
-      ticket_type: category, // 👈 Required by your database schema!
-      category,
-      subject,
-      message,
-      status: 'open',
-      user_id: user?.id || null,
-    })
-
-    if (error) {
-      setErrorMsg('Failed to submit ticket: ' + error.message)
-    } else {
       setSubmitted(true)
       setSubject('')
       setMessage('')
+    } catch (err: any) {
+      setErrorMsg('Failed to submit ticket: ' + (err.message || 'Please log in first'))
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -128,4 +124,3 @@ export default function SupportPage() {
     </div>
   )
 }
-
