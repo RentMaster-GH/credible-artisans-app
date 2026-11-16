@@ -1,8 +1,7 @@
-// components/chat/ChatBox.tsx
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 import { ChatMessage } from '@/types/chat';
 import { VideoCallOverlay } from './VideoCallOverlay';
 
@@ -25,55 +24,61 @@ export const ChatBox: React.FC<Props> = ({
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll to bottom of chat
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // 1. Fetch initial message history
   useEffect(() => {
-    async function fetchMessages() {
-      const { data, error } = await (supabase.from as any)('chat_messages')
-        .select('*')
-        .eq('room_id', roomId)
-        .order('created_at', { ascending: true });
+    let isMounted = true;
 
-      if (!error && data) {
-        setMessages(data as ChatMessage[]);
+    async function fetchMessages(isInitial = false) {
+      try {
+        const records = await backend.list<any>('chat_messages');
+        const roomMessages: ChatMessage[] = records
+          .filter((rec) => rec.data?.room_id === roomId)
+          .map((rec) => ({
+            id: rec.id,
+            room_id: rec.data?.room_id,
+            sender_id: rec.data?.sender_id,
+            message: rec.data?.message || '',
+            is_video_invite: Boolean(rec.data?.is_video_invite),
+            created_at: rec.created_at,
+          }))
+          .sort(
+            (a, b) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+
+        if (isMounted) {
+          setMessages((prev) => {
+            if (prev.length !== roomMessages.length) {
+              setTimeout(scrollToBottom, 50);
+            }
+            return roomMessages;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load messages:', err);
+      } finally {
+        if (isInitial && isMounted) {
+          setLoading(false);
+          setTimeout(scrollToBottom, 50);
+        }
       }
-      setLoading(false);
-      scrollToBottom();
     }
 
-    fetchMessages();
-  }, [roomId]);
+    fetchMessages(true);
 
-  // 2. Subscribe to Supabase Realtime WebSocket changes
-  useEffect(() => {
-    const channel = supabase
-      .channel(`chat_room_${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload: any) => {
-          const newMessage = payload.new as ChatMessage;
-          setMessages((prev) => [...prev, newMessage]);
-          scrollToBottom();
-        }
-      )
-      .subscribe();
+    const interval = setInterval(() => {
+      fetchMessages(false);
+    }, 2500);
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      clearInterval(interval);
     };
   }, [roomId]);
 
-  // 3. Send Message function
   const handleSendMessage = async (e?: React.FormEvent, isVideoCallInvite = false) => {
     if (e) e.preventDefault();
     const content = isVideoCallInvite
@@ -84,22 +89,33 @@ export const ChatBox: React.FC<Props> = ({
 
     if (!isVideoCallInvite) setText('');
 
-    const { error } = await (supabase.from as any)('chat_messages').insert({
-      room_id: roomId,
-      sender_id: currentUserId,
-      message: content,
-      is_video_invite: isVideoCallInvite,
-    });
+    try {
+      const created = await backend.create<any>('chat_messages', {
+        room_id: roomId,
+        sender_id: currentUserId,
+        message: content,
+        is_video_invite: isVideoCallInvite,
+      });
 
-    if (error) {
-      console.error('Failed to send message:', error.message);
+      const newMsg: ChatMessage = {
+        id: created.id,
+        room_id: roomId,
+        sender_id: currentUserId,
+        message: content,
+        is_video_invite: isVideoCallInvite,
+        created_at: created.created_at || new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, newMsg]);
+      setTimeout(scrollToBottom, 50);
+    } catch (err: any) {
+      console.error('Failed to send message:', err.message);
     }
   };
 
-  // 4. Start Video Call
   const startVideoCall = () => {
     setIsVideoActive(true);
-    handleSendMessage(undefined, true); // Post video invitation in chat
+    handleSendMessage(undefined, true);
   };
 
   return (
@@ -149,7 +165,7 @@ export const ChatBox: React.FC<Props> = ({
                   }`}
                 >
                   <p>{msg.message}</p>
-                  
+
                   {/* Join Video Call Button inside invite messages */}
                   {msg.is_video_invite && (
                     <button
