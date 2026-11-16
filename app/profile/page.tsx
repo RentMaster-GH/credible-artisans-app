@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 const SKILLS = [
@@ -21,15 +21,15 @@ const SKILLS = [
 
 export default function ProfilePage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [profileRecordId, setProfileRecordId] = useState<string | null>(null)
+  const [artisanRecordId, setArtisanRecordId] = useState<string | null>(null)
 
-  // Form states
   const [profileData, setProfileData] = useState({
     full_name: '',
     phone_number: '',
@@ -49,54 +49,61 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchUserData = async () => {
       setLoading(true)
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      try {
+        const { payload } = await backend.getMe()
+        const uid = payload.sub as string
+        const custom = (payload.custom as Record<string, any>) || {}
+        setUserId(uid)
 
-      if (userError || !user) {
+        const profiles = await backend.list<any>('profiles')
+        const existingProfile = profiles.find(
+          (p) => (p.data?.user_id || p.owner_id) === uid
+        )
+
+        if (existingProfile) {
+          setProfileRecordId(existingProfile.id)
+          const d = existingProfile.data || {}
+          setProfileData({
+            full_name: d.full_name || custom.full_name || '',
+            phone_number: d.phone_number || '',
+            avatar_url: d.avatar_url || '',
+            role: d.role || custom.account_type || 'client',
+          })
+        } else {
+          setProfileData((prev) => ({
+            ...prev,
+            full_name: custom.full_name || '',
+            role: custom.account_type || 'client',
+          }))
+        }
+
+        const artisans = await backend.list<any>('artisans')
+        const existingArtisan = artisans.find(
+          (a) => (a.data?.user_id || a.owner_id) === uid
+        )
+
+        if (existingArtisan) {
+          setArtisanRecordId(existingArtisan.id)
+          const a = existingArtisan.data || {}
+          setArtisanData({
+            business_name: a.business_name || '',
+            primary_skill: a.primary_skill || SKILLS[0],
+            bio: a.bio || '',
+            experience_years: a.experience_years?.toString() || '0',
+            hourly_rate: a.hourly_rate?.toString() || '',
+            location: a.location || '',
+          })
+        }
+      } catch {
         router.push('/login')
         return
+      } finally {
+        setLoading(false)
       }
-
-      setUserId(user.id)
-
-      // Fetch profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (profile) {
-        setProfileData({
-          full_name: profile.full_name || '',
-          phone_number: profile.phone_number || '',
-          avatar_url: profile.avatar_url || '',
-          role: profile.role || 'client',
-        })
-      }
-
-      // If artisan, fetch artisan details
-      const { data: artisan, error: artisanError } = await supabase
-        .from('artisans')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (artisan) {
-        setArtisanData({
-          business_name: artisan.business_name || '',
-          primary_skill: artisan.primary_skill || SKILLS[0],
-          bio: artisan.bio || '',
-          experience_years: artisan.experience_years?.toString() || '0',
-          hourly_rate: artisan.hourly_rate?.toString() || '',
-          location: artisan.location || '',
-        })
-      }
-
-      setLoading(false)
     }
 
     fetchUserData()
-  }, [router, supabase])
+  }, [router])
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setProfileData({
@@ -122,51 +129,53 @@ export default function ProfilePage() {
 
     if (!userId) return
 
-    // 1. Update Profile
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update({
+    try {
+      const profilePayload = {
+        user_id: userId,
         full_name: profileData.full_name.trim(),
         phone_number: profileData.phone_number.trim(),
         avatar_url: profileData.avatar_url.trim(),
         role: profileData.role,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId)
-
-    if (profileUpdateError) {
-      setErrorMsg(profileUpdateError.message || 'Failed to update profile details.')
-      setSaving(false)
-      return
-    }
-
-    // 2. If role is artisan, ensure artisan row exists/updates
-    if (profileData.role === 'artisan') {
-      const artisanPayload = {
-        id: userId,
-        business_name: artisanData.business_name.trim(),
-        primary_skill: artisanData.primary_skill,
+        skills: profileData.role === 'artisan' ? [artisanData.primary_skill] : [],
         bio: artisanData.bio.trim(),
-        experience_years: parseInt(artisanData.experience_years) || 0,
         hourly_rate: artisanData.hourly_rate ? parseFloat(artisanData.hourly_rate) : null,
-        location: artisanData.location.trim() || 'Global',
-        updated_at: new Date().toISOString(),
+        location: artisanData.location.trim() || 'Cape Coast, Ghana',
       }
 
-      const { error: artisanUpsertError } = await supabase
-        .from('artisans')
-        .upsert(artisanPayload)
-
-      if (artisanUpsertError) {
-        setErrorMsg(artisanUpsertError.message || 'Failed to update artisan portfolio details.')
-        setSaving(false)
-        return
+      if (profileRecordId) {
+        await backend.update('profiles', profileRecordId, profilePayload)
+      } else {
+        const created = await backend.create<any>('profiles', profilePayload)
+        setProfileRecordId(created.id)
       }
+
+      if (profileData.role === 'artisan') {
+        const artisanPayload = {
+          user_id: userId,
+          business_name: artisanData.business_name.trim(),
+          primary_skill: artisanData.primary_skill,
+          bio: artisanData.bio.trim(),
+          experience_years: parseInt(artisanData.experience_years) || 0,
+          hourly_rate: artisanData.hourly_rate ? parseFloat(artisanData.hourly_rate) : null,
+          location: artisanData.location.trim() || 'Global',
+        }
+
+        if (artisanRecordId) {
+          await backend.update('artisans', artisanRecordId, artisanPayload)
+        } else {
+          const createdArtisan = await backend.create<any>('artisans', artisanPayload)
+          setArtisanRecordId(createdArtisan.id)
+        }
+      }
+
+      localStorage.setItem('active_mode', profileData.role)
+      setSuccessMsg('Profile successfully updated!')
+      router.refresh()
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to update profile details.')
+    } finally {
+      setSaving(false)
     }
-
-    setSuccessMsg('Profile successfully updated!')
-    setSaving(false)
-    router.refresh()
   }
 
   if (loading) {
@@ -183,8 +192,6 @@ export default function ProfilePage() {
       <Navbar />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
-        
-        {/* Breadcrumb */}
         <div className="mb-6">
           <Link
             href="/dashboard"
@@ -194,7 +201,6 @@ export default function ProfilePage() {
           </Link>
         </div>
 
-        {/* Profile Card Container */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-10">
           <div className="border-b border-gray-100 pb-5 mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Account & Profile Settings</h1>
@@ -216,8 +222,6 @@ export default function ProfilePage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            
-            {/* SECTION 1: Personal Details */}
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">
                 1. Personal Information
@@ -289,7 +293,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* SECTION 2: Artisan Professional Portfolio (Conditional) */}
             {profileData.role === 'artisan' && (
               <div className="pt-4 animate-fadeIn">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100 flex items-center justify-between">
@@ -354,7 +357,7 @@ export default function ProfilePage() {
 
                     <div>
                       <label htmlFor="hourly_rate" className="block text-sm font-semibold text-gray-700 mb-1">
-                        Hourly Rate (USD / Base)
+                        Hourly Rate (GHS)
                       </label>
                       <input
                         type="number"
@@ -404,7 +407,6 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="pt-4 flex items-center justify-end space-x-4 border-t border-gray-100">
               <Link
                 href="/dashboard"
@@ -420,7 +422,6 @@ export default function ProfilePage() {
                 {saving ? 'Saving Changes...' : 'Save Profile'}
               </button>
             </div>
-
           </form>
         </div>
       </div>
