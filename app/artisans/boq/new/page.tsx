@@ -1,13 +1,43 @@
-// app/artisan/boq/new/page.tsx
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { BoqForm } from '@/components/boq/BoqForm';
+import { backend } from '@/lib/backend';
 import Link from 'next/link';
 
 export default function CreateBoqPage() {
-  // Replace with your actual logged-in Artisan User ID (e.g. from Supabase auth context or session)
-  const currentArtisanId = "YOUR_LOGGED_IN_ARTISAN_ID"; 
+  const router = useRouter();
+  const [currentArtisanId, setCurrentArtisanId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadSession() {
+      try {
+        const { payload } = await backend.getMe();
+        if (payload?.sub) {
+          setCurrentArtisanId(String(payload.sub));
+        } else {
+          router.push('/login');
+        }
+      } catch {
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSession();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!currentArtisanId) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -23,7 +53,7 @@ export default function CreateBoqPage() {
       <BoqForm 
         artisanId={currentArtisanId} 
         onSuccess={() => {
-          window.location.href = '/artisan/boq';
+          router.push('/artisan/boq');
         }} 
       />
     </div>
