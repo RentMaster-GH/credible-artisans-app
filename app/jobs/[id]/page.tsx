@@ -1,152 +1,178 @@
-'use client'
+// app/jobs/[id]/page.tsx
+'use client';
 
-import { useEffect, useState, use } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import Navbar from '@/components/Navbar'
+import { useEffect, useState, use } from 'react';
+import Link from 'next/link';
+import { backend } from '@/lib/backend';
+import Navbar from '@/components/Navbar';
 
 interface Job {
-  id: string
-  client_id: string
-  title: string
-  description: string
-  category: string
-  location: string
-  budget_min: number | null
-  budget_max: number | null
-  currency: string
-  status: string
-  created_at: string
+  id: string;
+  client_id: string;
+  title: string;
+  description: string;
+  category: string;
+  location: string;
+  budget_min: number | null;
+  budget_max: number | null;
+  currency: string;
+  status: string;
+  created_at: string;
 }
 
 interface Bid {
-  id: string
-  amount: number
-  proposed_timeline: string
-  cover_letter: string
-  status: string
-  created_at: string
-  artisan_id: string
+  id: string;
+  job_id: string;
+  amount: number;
+  proposed_timeline: string;
+  cover_letter: string;
+  status: string;
+  created_at: string;
+  artisan_id: string;
 }
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params)
-  const jobId = resolvedParams.id
+  const resolvedParams = use(params);
+  const jobId = resolvedParams.id;
 
-  const [job, setJob] = useState<Job | null>(null)
-  const [bids, setBids] = useState<Bid[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submittingBid, setSubmittingBid] = useState(false)
-  const [currentUser, setCurrentUser] = useState<any>(null)
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [job, setJob] = useState<Job | null>(null);
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submittingBid, setSubmittingBid] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Bid form state
   const [bidForm, setBidForm] = useState({
     amount: '',
     proposed_timeline: '',
     cover_letter: '',
-  })
-
-  const router = useRouter()
-  const supabase = createClient()
+  });
 
   useEffect(() => {
     const fetchJobData = async () => {
-      setLoading(true)
+      setLoading(true);
 
-      // 1. Get Session
-      const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user ?? null
-      setCurrentUser(user)
-      if (user) {
-        setUserRole(user.user_metadata?.role || 'client')
+      try {
+        const me = await backend.getMe();
+        const payload = me.payload || {};
+        const custom = (payload.custom as Record<string, any>) || {};
+        setCurrentUser({
+          id: payload.sub as string,
+          role: custom.account_type || (payload.role as string) || 'client',
+        });
+      } catch {
+        setCurrentUser(null);
       }
 
-      // 2. Fetch Job Details
-      const { data: jobData, error: jobError } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', jobId)
-        .single()
-
-      if (jobError) {
-        console.error('Error fetching job:', jobError)
-      } else {
-        setJob(jobData as unknown as Job)
+      try {
+        const jobRecords = await backend.list<any>('jobs');
+        const found = jobRecords.find((rec: any) => rec.id === jobId);
+        if (found) {
+          const data = found.data || found;
+          setJob({
+            id: found.id,
+            client_id: found.owner_id || data.client_id || '',
+            title: data.title || 'Untitled Job',
+            description: data.description || '',
+            category: data.category || 'General',
+            location: data.location || 'Ghana',
+            budget_min: data.budget_min ?? null,
+            budget_max: data.budget_max ?? null,
+            currency: data.currency || 'GHS',
+            status: data.status || 'open',
+            created_at: found.created_at || new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching job:', err);
       }
 
-      // 3. Fetch Bids for this Job
-      const { data: bidsData, error: bidsError } = await supabase
-        .from('bids')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: false })
-
-      if (!bidsError) {
-        setBids((bidsData as unknown as Bid[]) || [])
+      try {
+        const bidRecords = await backend.list<any>('bids');
+        const jobBids: Bid[] = bidRecords
+          .map((rec: any) => {
+            const data = rec.data || rec;
+            return {
+              id: rec.id,
+              job_id: data.job_id,
+              amount: Number(data.amount) || 0,
+              proposed_timeline: data.proposed_timeline || '',
+              cover_letter: data.cover_letter || '',
+              status: data.status || 'pending',
+              created_at: rec.created_at || new Date().toISOString(),
+              artisan_id: rec.owner_id || data.artisan_id || '',
+            };
+          })
+          .filter((b: Bid) => b.job_id === jobId);
+        setBids(jobBids);
+      } catch (err) {
+        console.error('Error fetching bids:', err);
       }
 
-      setLoading(false)
-    }
+      setLoading(false);
+    };
 
-    fetchJobData()
-  }, [jobId, supabase])
+    fetchJobData();
+  }, [jobId]);
 
   const handleBidSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmittingBid(true)
-    setErrorMsg(null)
-    setSuccessMsg(null)
+    e.preventDefault();
+    setSubmittingBid(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
 
     if (!currentUser) {
-      setErrorMsg('You must be signed in as an artisan to submit a proposal.')
-      setSubmittingBid(false)
-      return
+      setErrorMsg('You must be signed in as an artisan to submit a proposal.');
+      setSubmittingBid(false);
+      return;
     }
 
-    const amountNum = parseFloat(bidForm.amount)
+    const amountNum = parseFloat(bidForm.amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      setErrorMsg('Please enter a valid bid amount.')
-      setSubmittingBid(false)
-      return
+      setErrorMsg('Please enter a valid bid amount.');
+      setSubmittingBid(false);
+      return;
     }
 
     if (!bidForm.proposed_timeline.trim() || !bidForm.cover_letter.trim()) {
-      setErrorMsg('Please complete all proposal fields.')
-      setSubmittingBid(false)
-      return
+      setErrorMsg('Please complete all proposal fields.');
+      setSubmittingBid(false);
+      return;
     }
 
-    // Insert Bid
-    const { error: insertError } = await (supabase.from as any)('bids').insert({
-      job_id: jobId,
-      artisan_id: currentUser.id,
-      amount: amountNum,
-      proposed_timeline: bidForm.proposed_timeline.trim(),
-      cover_letter: bidForm.cover_letter.trim(),
-      status: 'pending',
-    })
+    try {
+      const created = await backend.create<any>('bids', {
+        job_id: jobId,
+        artisan_id: currentUser.id,
+        amount: amountNum,
+        proposed_timeline: bidForm.proposed_timeline.trim(),
+        cover_letter: bidForm.cover_letter.trim(),
+        status: 'pending',
+      });
 
-    if (insertError) {
-      console.error('Error submitting bid:', insertError)
-      setErrorMsg(insertError.message || 'Failed to submit proposal. Ensure you have an artisan profile setup.')
-    } else {
-      setSuccessMsg('Your proposal has been submitted successfully!')
-      setBidForm({ amount: '', proposed_timeline: '', cover_letter: '' })
-      // Refresh bids
-      const { data: refreshedBids } = await supabase
-        .from('bids')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: false })
-      if (refreshedBids) setBids(refreshedBids as unknown as Bid[])
+      setSuccessMsg('Your proposal has been submitted successfully!');
+      setBidForm({ amount: '', proposed_timeline: '', cover_letter: '' });
+
+      setBids((prev) => [
+        {
+          id: created.id || `bid-${Date.now()}`,
+          job_id: jobId,
+          amount: amountNum,
+          proposed_timeline: bidForm.proposed_timeline.trim(),
+          cover_letter: bidForm.cover_letter.trim(),
+          status: 'pending',
+          created_at: created.created_at || new Date().toISOString(),
+          artisan_id: currentUser.id,
+        },
+        ...prev,
+      ]);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to submit proposal.');
+    } finally {
+      setSubmittingBid(false);
     }
-
-    setSubmittingBid(false)
-  }
+  };
 
   if (loading) {
     return (
@@ -154,7 +180,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <Navbar />
         <div className="text-center py-20 text-gray-500">Loading job details...</div>
       </div>
-    )
+    );
   }
 
   if (!job) {
@@ -169,18 +195,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  const isJobOwner = currentUser && currentUser.id === job.client_id
+  const isJobOwner = currentUser && currentUser.id === job.client_id;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
-        
-        {/* Breadcrumb */}
         <Link href="/jobs" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1 mb-6">
           ← Back to Job Board
         </Link>
@@ -254,7 +278,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
           )}
 
-          {/* Submit Bid Form (Only for non-owners / artisans) */}
+          {/* Submit Bid Form */}
           {!isJobOwner && (
             <div className="border-t border-gray-100 pt-8">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Submit Your Proposal</h3>
@@ -327,11 +351,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               </form>
             </div>
           )}
-
         </div>
-
       </div>
     </div>
-  )
+  );
 }
-
