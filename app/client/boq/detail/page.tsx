@@ -1,10 +1,10 @@
-// app/client/boq/[id]/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Boq } from '@/types/boq';
 import { BoqView } from '@/components/boq/BoqView';
+import { backend } from '@/lib/backend';
 
 export default function ClientBoqDetailPage() {
   const params = useParams();
@@ -17,12 +17,20 @@ export default function ClientBoqDetailPage() {
   useEffect(() => {
     async function fetchBoq() {
       try {
-        const res = await fetch(`/api/boq/${boqId}`);
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed to fetch BOQ');
-        setBoq(json.data);
+        const records = await backend.list<any>('boqs');
+        const match = records.find((r) => r.id === boqId);
+
+        if (!match) {
+          throw new Error('BOQ document not found.');
+        }
+
+        setBoq({
+          id: match.id,
+          created_at: match.created_at,
+          ...match.data,
+        } as Boq);
       } catch (err: any) {
-        setError(err.message);
+        setError(err.message || 'Failed to fetch BOQ');
       } finally {
         setLoading(false);
       }
