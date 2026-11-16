@@ -4,45 +4,80 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { backend } from '@/lib/backend'
+
+interface CurrentUser {
+  id: string
+  email?: string
+  role: string
+  full_name: string
+}
 
 export default function Navbar() {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<CurrentUser | null>(null)
   const [fullName, setFullName] = useState<string>('')
   const [role, setRole] = useState<string>('artisan')
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  
+
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
 
   useEffect(() => {
+    let isMounted = true
+
     const fetchUserData = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
+      try {
+        const { payload } = await backend.getMe()
+        if (!isMounted) return
 
-      if (currentUser) {
-        const { data: profile } = await (supabase.from as any)('profiles')
-          .select('full_name, role')
-          .eq('id', currentUser.id)
-          .single()
+        const custom = (payload.custom as Record<string, any>) || {}
+        const resolvedName = custom.full_name || 'User'
+        const resolvedRole = custom.account_type || payload.role || 'client'
 
-        if (profile) {
-          setFullName(profile.full_name || 'User')
-          setRole(profile.role === 'client' ? 'client' : 'artisan')
+        // Check if user switched role inside the profiles collection
+        let activeRole = resolvedRole
+        let activeName = resolvedName
+        try {
+          const profiles = await backend.list<any>('profiles')
+          const myProfile = profiles.find(
+            (p) => p.owner_id === payload.sub || p.data?.user_id === payload.sub
+          )
+          if (myProfile?.data) {
+            if (myProfile.data.role) activeRole = myProfile.data.role
+            if (myProfile.data.full_name) activeName = myProfile.data.full_name
+          }
+        } catch {
+          // Fallback to token claims if profiles collection has no entry yet
+        }
+
+        if (!isMounted) return
+        setUser({
+          id: String(payload.sub || ''),
+          role: activeRole,
+          full_name: activeName,
+        })
+        setFullName(activeName)
+        setRole(activeRole === 'client' ? 'client' : 'artisan')
+      } catch {
+        if (isMounted) {
+          setUser(null)
+          setFullName('')
         }
       }
     }
 
     fetchUserData()
-  }, [supabase, pathname])
+
+    return () => {
+      isMounted = false
+    }
+  }, [pathname])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await backend.logout()
     setUser(null)
     router.push('/login')
+    router.refresh()
   }
 
   const getInitials = (name: string) => {
@@ -57,7 +92,6 @@ export default function Navbar() {
   return (
     <nav className="bg-gray-900/90 border-b border-gray-800 sticky top-0 z-50 backdrop-blur-md text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        
         {/* Brand Logo */}
         <Link href="/dashboard" className="flex items-center gap-3 group">
           <div className="w-9 h-9 bg-amber-500 group-hover:bg-amber-400 rounded-xl flex items-center justify-center font-black text-black text-lg shadow-lg shadow-amber-500/20 transition">
@@ -73,7 +107,9 @@ export default function Navbar() {
           <Link
             href="/dashboard"
             className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
-              pathname === '/dashboard' ? 'bg-amber-500 text-black shadow-sm' : 'text-gray-300 hover:text-white'
+              pathname === '/dashboard'
+                ? 'bg-amber-500 text-black shadow-sm'
+                : 'text-gray-300 hover:text-white'
             }`}
           >
             📊 Portal Dashboard
@@ -82,7 +118,9 @@ export default function Navbar() {
           <Link
             href="/jobs"
             className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
-              pathname?.startsWith('/jobs') ? 'bg-amber-500 text-black shadow-sm' : 'text-gray-300 hover:text-white'
+              pathname?.startsWith('/jobs')
+                ? 'bg-amber-500 text-black shadow-sm'
+                : 'text-gray-300 hover:text-white'
             }`}
           >
             📋 Job Marketplace
@@ -91,7 +129,9 @@ export default function Navbar() {
           <Link
             href="/artisans/boq"
             className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
-              pathname?.startsWith('/artisans/boq') ? 'bg-amber-500 text-black shadow-sm' : 'text-gray-300 hover:text-white'
+              pathname?.startsWith('/artisans/boq') || pathname?.startsWith('/artisan/boq')
+                ? 'bg-amber-500 text-black shadow-sm'
+                : 'text-gray-300 hover:text-white'
             }`}
           >
             📐 BOQ Generator
@@ -110,7 +150,9 @@ export default function Navbar() {
                   {getInitials(fullName)}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-xs font-bold text-white leading-tight">{fullName || 'Account'}</p>
+                  <p className="text-xs font-bold text-white leading-tight">
+                    {fullName || 'Account'}
+                  </p>
                   <p className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold">
                     {role === 'artisan' ? '🛠️ Artisan' : '👤 Client'}
                   </p>
@@ -135,7 +177,7 @@ export default function Navbar() {
                   >
                     📊 Portal Dashboard
                   </Link>
-                  
+
                   <Link
                     href="/jobs"
                     onClick={() => setDropdownOpen(false)}
@@ -175,7 +217,6 @@ export default function Navbar() {
             </div>
           )}
         </div>
-
       </div>
     </nav>
   )
