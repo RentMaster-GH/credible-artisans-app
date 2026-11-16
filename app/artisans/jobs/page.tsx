@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import { createClient } from '@/lib/supabase/client';
+import { backend } from '@/lib/backend';
 
 interface Job {
   id: string;
@@ -19,7 +19,6 @@ interface Job {
   client_id?: string;
 }
 
-// Fallback sample jobs if database table is currently empty
 const SAMPLE_JOBS: Job[] = [
   {
     id: 'sample-1',
@@ -60,8 +59,6 @@ const SAMPLE_JOBS: Job[] = [
 ];
 
 export default function JobMarketplacePage() {
-  const supabase = createClient();
-
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,20 +74,27 @@ export default function JobMarketplacePage() {
 
   const categories = ['All', 'Electrical', 'Carpentry', 'Plumbing & Tiling', 'Masonry', 'Painting'];
 
-  // Fetch Jobs from Supabase
   useEffect(() => {
     async function fetchJobs() {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('jobs')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          setJobs(data as Job[]);
+        const records = await backend.list<any>('jobs');
+        if (records && records.length > 0) {
+          const formatted: Job[] = records.map((r) => ({
+            id: r.id,
+            title: r.data?.title || 'Untitled Job',
+            category: r.data?.category || 'General',
+            location: r.data?.location || 'Remote / Direct',
+            budget_min: r.data?.budget_min ?? null,
+            budget_max: r.data?.budget_max ?? null,
+            currency: r.data?.currency || '₦',
+            status: r.data?.status || 'open',
+            created_at: r.created_at,
+            description: r.data?.description || '',
+            client_id: r.owner_id,
+          }));
+          setJobs(formatted);
         } else {
-          // Fallback to sample data for visual preview
           setJobs(SAMPLE_JOBS);
         }
       } catch (err) {
@@ -102,9 +106,8 @@ export default function JobMarketplacePage() {
     }
 
     fetchJobs();
-  }, [supabase]);
+  }, []);
 
-  // Handle Proposal Submission to Supabase
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedJobForBid) return;
@@ -113,26 +116,17 @@ export default function JobMarketplacePage() {
     setBidFeedbackMsg(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { payload } = await backend.getMe();
 
-      if (!user) {
-        setBidFeedbackMsg({ type: 'error', text: 'Please sign in to submit a proposal.' });
-        setIsSubmittingBid(false);
-        return;
-      }
-
-      const { error } = await (supabase.from as any)('bids').insert([
-        {
-          job_id: selectedJobForBid.id,
-          artisan_id: user.id,
-          amount: Number(bidAmount),
-          proposed_timeline: bidTimeline,
-          cover_letter: bidCoverLetter,
-          status: 'pending',
-        },
-      ]);
-
-      if (error) throw error;
+      await backend.create('bids', {
+        job_id: selectedJobForBid.id,
+        job_title: selectedJobForBid.title,
+        artisan_id: payload.sub,
+        amount: Number(bidAmount),
+        proposed_timeline: bidTimeline,
+        cover_letter: bidCoverLetter,
+        status: 'pending',
+      });
 
       setBidFeedbackMsg({ type: 'success', text: 'Your proposal was submitted successfully!' });
       setTimeout(() => {
@@ -142,13 +136,12 @@ export default function JobMarketplacePage() {
         setBidFeedbackMsg(null);
       }, 2000);
     } catch (err: any) {
-      setBidFeedbackMsg({ type: 'error', text: err.message || 'Failed to submit proposal.' });
+      setBidFeedbackMsg({ type: 'error', text: err.message || 'Please sign in to submit a proposal.' });
     } finally {
       setIsSubmittingBid(false);
     }
   };
 
-  // Filtered Jobs
   const filteredJobs = jobs.filter((job) => {
     const matchesCategory = selectedCategory === 'All' || job.category?.toLowerCase() === selectedCategory.toLowerCase();
     const matchesSearch =
@@ -163,8 +156,7 @@ export default function JobMarketplacePage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        
-        {/* HERO BANNER - Exact Dashboard Gradient */}
+        {/* HERO BANNER */}
         <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-400/20">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -305,7 +297,6 @@ export default function JobMarketplacePage() {
                       </p>
                     </div>
 
-                    {/* Submit Proposal Action */}
                     <button
                       onClick={() => {
                         setSelectedJobForBid(job);
@@ -321,7 +312,6 @@ export default function JobMarketplacePage() {
             ))}
           </div>
         )}
-
       </main>
 
       {/* PROPOSAL SUBMISSION MODAL DRAWER */}
@@ -420,7 +410,6 @@ export default function JobMarketplacePage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
