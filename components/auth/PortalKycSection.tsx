@@ -1,11 +1,13 @@
-// components/auth/PortalKycSection.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 
 export const PortalKycSection: React.FC = () => {
   const [isVerified, setIsVerified] = useState(false);
+  const [profileRecordId, setProfileRecordId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [fullName, setFullName] = useState('User');
   const [idType, setIdType] = useState('national_id');
   const [idNumber, setIdNumber] = useState('');
   const [location, setLocation] = useState('');
@@ -16,49 +18,64 @@ export const PortalKycSection: React.FC = () => {
 
   useEffect(() => {
     async function loadProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await (supabase.from as any)('profiles')
-          .select('is_verified, id_type, id_number, location')
-          .eq('id', user.id)
-          .single();
+      try {
+        const me = await backend.getMe();
+        const uid = me.payload?.sub as string;
+        const custom = (me.payload?.custom as Record<string, any>) || {};
+        if (uid) {
+          setUserId(uid);
+          setFullName(custom.full_name || 'User');
 
-        if (profile) {
-          setIsVerified(!!profile.is_verified);
-          if (profile.id_type) setIdType(profile.id_type);
-          if (profile.id_number) setIdNumber(profile.id_number);
-          if (profile.location) setLocation(profile.location);
+          const profiles = await backend.list<any>('profiles');
+          const existing = profiles.find((p) => p.owner_id === uid || p.data?.user_id === uid);
+          if (existing) {
+            setProfileRecordId(existing.id);
+            const d = existing.data || {};
+            setIsVerified(!!d.is_verified);
+            if (d.id_type) setIdType(d.id_type);
+            if (d.id_number) setIdNumber(d.id_number);
+            if (d.location) setLocation(d.location);
+          }
         }
+      } catch {
+        // Not logged in
+      } finally {
+        setFetching(false);
       }
-      setFetching(false);
     }
     loadProfile();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userId) return;
     setLoading(true);
     setMessage('');
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await (supabase.from as any)('profiles')
-      .update({
+    try {
+      const kycPayload = {
+        user_id: userId,
+        full_name: fullName,
         id_type: idType,
         id_number: idNumber,
         id_document_url: idDocumentUrl,
         location,
         is_verified: true,
-      })
-      .eq('id', user.id);
+      };
 
-    setLoading(false);
-    if (!error) {
+      if (profileRecordId) {
+        await backend.update('profiles', profileRecordId, kycPayload);
+      } else {
+        const created = await backend.create<any>('profiles', kycPayload);
+        if (created?.id) setProfileRecordId(created.id);
+      }
+
       setIsVerified(true);
       setMessage('✅ Identity verified successfully! Full portal, live calls, and messaging enabled.');
-    } else {
-      setMessage('❌ Failed to update KYC: ' + error.message);
+    } catch (err: any) {
+      setMessage('❌ Failed to update KYC: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -161,4 +178,3 @@ export const PortalKycSection: React.FC = () => {
     </div>
   );
 };
-
