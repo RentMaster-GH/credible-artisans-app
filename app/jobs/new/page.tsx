@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 
 const CATEGORIES = [
   'Carpentry & Woodwork',
@@ -29,7 +29,6 @@ const CURRENCIES = [
 
 export default function PostNewJobPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -58,39 +57,34 @@ export default function PostNewJobPage() {
     setLoading(true)
     setErrorMsg(null)
 
-    // 1. Get authenticated client session
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    try {
+      // 1. Get authenticated client session from your custom backend
+      const { payload } = await backend.getMe()
+      if (!payload?.sub) {
+        setErrorMsg('You must be signed in to post a job request.')
+        setLoading(false)
+        return
+      }
 
-    if (userError || !user) {
-      setErrorMsg('You must be signed in to post a job request.')
-      setLoading(false)
-      return
-    }
+      // 2. Validate inputs
+      if (!formData.title.trim() || !formData.description.trim() || !formData.location.trim()) {
+        setErrorMsg('Please fill in all required fields.')
+        setLoading(false)
+        return
+      }
 
-    // 2. Validate inputs
-    if (!formData.title.trim() || !formData.description.trim() || !formData.location.trim()) {
-      setErrorMsg('Please fill in all required fields.')
-      setLoading(false)
-      return
-    }
+      const minBudget = formData.budget_min ? parseFloat(formData.budget_min) : null
+      const maxBudget = formData.budget_max ? parseFloat(formData.budget_max) : null
 
-    const minBudget = formData.budget_min ? parseFloat(formData.budget_min) : null
-    const maxBudget = formData.budget_max ? parseFloat(formData.budget_max) : null
+      if (minBudget && maxBudget && minBudget > maxBudget) {
+        setErrorMsg('Minimum budget cannot exceed maximum budget.')
+        setLoading(false)
+        return
+      }
 
-    if (minBudget && maxBudget && minBudget > maxBudget) {
-      setErrorMsg('Minimum budget cannot exceed maximum budget.')
-      setLoading(false)
-      return
-    }
-
-    // 3. Insert job into Supabase
-    const { error: insertError } = await supabase
-      .from('jobs')
-      .insert({
-        client_id: user.id,
+      // 3. Insert job into your custom backend 'jobs' collection
+      await backend.create('jobs', {
+        client_id: payload.sub,
         title: formData.title.trim(),
         category: formData.category,
         description: formData.description.trim(),
@@ -101,16 +95,14 @@ export default function PostNewJobPage() {
         status: 'open',
       })
 
-    if (insertError) {
-      console.error('Error posting job:', insertError)
-      setErrorMsg(insertError.message || 'Failed to submit job posting. Please try again.')
+      // 4. Redirect to Dashboard
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err: any) {
+      console.error('Error posting job:', err)
+      setErrorMsg(err.message || 'You must be signed in to post a job request.')
       setLoading(false)
-      return
     }
-
-    // 4. Redirect to Dashboard
-    router.push(`/dashboard`)
-    router.refresh()
   }
 
   return (
