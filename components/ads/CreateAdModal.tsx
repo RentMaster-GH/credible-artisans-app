@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 import { AD_PRICING, AdCurrency } from '@/types/advertisement';
 
 interface Props {
@@ -58,18 +58,26 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     });
   };
 
-  // Process saving to Supabase after payment authorization
+  // Process saving to custom backend after payment authorization
   const saveAdvertisement = async (paymentRef: string) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      let artisanId: string | null = null;
+      try {
+        const me = await backend.getMe();
+        artisanId = (me.payload?.sub as string) || null;
+      } catch {
+        // Proceed if user is not signed in
+      }
 
-      const { error: insertError } = await (supabase.from as any)('ads').insert({
-        artisan_id: userData?.user?.id || null,
+      await backend.create('ads', {
+        artisan_id: artisanId,
         shop_name: shopName,
         headline,
         category,
         contact_phone: contactPhone,
-        image_url: imageUrl || 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
+        image_url:
+          imageUrl ||
+          'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=400',
         amount_paid: currentPricing.amount,
         currency,
         payment_reference: paymentRef,
@@ -79,12 +87,8 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
         status: 'active',
       });
 
-      if (insertError) {
-        setError(insertError.message);
-      } else {
-        setSubmitted(true);
-        if (onSuccess) onSuccess();
-      }
+      setSubmitted(true);
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to save advertisement.');
     } finally {
@@ -111,7 +115,14 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     }
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      let userEmail = '';
+      try {
+        const me = await backend.getMe();
+        userEmail = (me.payload?.email as string) || '';
+      } catch {
+        // Optional user email
+      }
+
       const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
       const referenceCode = 'AD_' + Math.floor(Math.random() * 1000000000 + 1);
 
@@ -128,7 +139,7 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
 
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
-        email: email || userData?.user?.email || 'advertiser@credibleartisans.com',
+        email: email || userEmail || 'advertiser@credibleartisans.com',
         amount: currentPricing.amount * 100, // Amount in pesewas / cents
         currency: currency,
         ref: referenceCode,
@@ -357,4 +368,3 @@ export const CreateAdModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =
     </div>
   );
 };
-
