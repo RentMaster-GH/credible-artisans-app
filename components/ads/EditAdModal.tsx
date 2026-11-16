@@ -1,8 +1,7 @@
-// components/ads/EditAdModal.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 import { Advertisement } from '@/types/advertisement';
 
 interface Props {
@@ -25,21 +24,21 @@ export const EditAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess })
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await (supabase.from as any)('ads').update({
+    try {
+      await backend.update('ads', ad.id, {
         shop_name: shopName,
         headline,
         contact_phone: contactPhone,
         image_url: imageUrl,
-      })
-      .eq('id', ad.id);
+      });
 
-    setLoading(false);
-    if (!error) {
       alert('Advertisement updated successfully!');
       onSuccess();
       onClose();
-    } else {
-      alert(error.message);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update advertisement.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -47,18 +46,15 @@ export const EditAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess })
     if (!confirm('Are you sure you want to delete this advertisement?')) return;
     setLoading(true);
 
-    const { error } = await supabase
-      .from('ads')
-      .delete()
-      .eq('id', ad.id);
-
-    setLoading(false);
-    if (!error) {
+    try {
+      await backend.remove('ads', ad.id);
       alert('Advertisement deleted.');
       onSuccess();
       onClose();
-    } else {
-      alert(error.message);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete advertisement.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -139,4 +135,3 @@ export const EditAdModal: React.FC<Props> = ({ ad, isOpen, onClose, onSuccess })
     </div>
   );
 };
-
