@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 interface Artisan {
@@ -26,31 +26,41 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ id: s
 
   const [artisan, setArtisan] = useState<Artisan | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
     const fetchArtisanProfile = async () => {
       setLoading(true)
+      try {
+        const records = await backend.list<any>('profiles')
+        const found = records.find((r) => r.id === id || r.owner_id === id)
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (error || !data) {
-        // Fallback or handle missing profiles gracefully
-        console.warn('Error fetching profile:', error?.message)
-      } else {
-        setArtisan(data as unknown as Artisan)
+        if (found) {
+          setArtisan({
+            id: found.id,
+            full_name: found.data?.full_name || 'Unnamed Artisan',
+            skills: found.data?.skills || null,
+            location: found.data?.location || 'Cape Coast, Ghana',
+            hourly_rate: found.data?.hourly_rate ?? null,
+            rating: found.data?.rating ?? null,
+            bio: found.data?.bio || null,
+            avatar_url: found.data?.avatar_url || null,
+            is_available: found.data?.is_available ?? true,
+            role: found.data?.role || null,
+            client_company: found.data?.client_company || null,
+            client_phone: found.data?.client_phone || null,
+          })
+        }
+      } catch (err) {
+        console.warn('Error fetching profile:', err)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     if (id) {
       fetchArtisanProfile()
     }
-  }, [id, supabase])
+  }, [id])
 
   if (loading) {
     return (
@@ -94,7 +104,6 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ id: s
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
-        
         <Link
           href="/artisans"
           className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 mb-6"
@@ -167,9 +176,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ id: s
               Contact / Hire Artisan ✉️
             </a>
           </div>
-
         </div>
-
       </div>
     </div>
   )
