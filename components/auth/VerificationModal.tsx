@@ -1,8 +1,7 @@
-// components/auth/VerificationModal.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 
 interface Props {
   isOpen: boolean;
@@ -27,17 +26,23 @@ export const VerificationModal: React.FC<Props> = ({ isOpen, userId, onClose, on
     setError('');
 
     try {
-      const { error: updateError } = await (supabase.from as any)('profiles')
-        .update({
-          id_type: idType,
-          id_number: idNumber,
-          id_document_url: idDocumentUrl,
-          location,
-          is_verified: true,
-        })
-        .eq('id', userId);
+      const profiles = await backend.list<any>('profiles');
+      const existing = profiles.find((p) => p.owner_id === userId || p.data?.user_id === userId);
 
-      if (updateError) throw updateError;
+      const payload = {
+        user_id: userId,
+        id_type: idType,
+        id_number: idNumber,
+        id_document_url: idDocumentUrl,
+        location,
+        is_verified: true,
+      };
+
+      if (existing) {
+        await backend.update('profiles', existing.id, payload);
+      } else {
+        await backend.create('profiles', payload);
+      }
 
       alert('Verification details submitted! You can now contact artisans near you.');
       onSuccess();
