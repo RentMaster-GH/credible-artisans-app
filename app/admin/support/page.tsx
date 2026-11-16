@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 interface Ticket {
@@ -14,54 +14,64 @@ interface Ticket {
   user_id: string | null
 }
 
-const DEVELOPER_EMAIL = 'papastickle@gmail.com' // 👈 Updated to your email!
+const DEVELOPER_EMAIL = 'papastickle@gmail.com'
 
 export default function AdminSupportPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [authorized, setAuthorized] = useState(false)
 
-  const supabase = createClient()
-
   useEffect(() => {
     const verifyAndFetch = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      try {
+        const { payload } = await backend.getMe()
+        const userEmail = (payload.email as string) || ''
 
-      if (!user || user.email !== DEVELOPER_EMAIL) {
+        if (userEmail !== DEVELOPER_EMAIL && payload.role !== 'admin') {
+          setAuthorized(false)
+          setLoading(false)
+          return
+        }
+
+        setAuthorized(true)
+        await fetchTickets()
+      } catch {
         setAuthorized(false)
         setLoading(false)
-        return
       }
-
-      setAuthorized(true)
-      fetchTickets()
     }
 
     verifyAndFetch()
-  }, [supabase])
+  }, [])
 
   const fetchTickets = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('customer_support')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setTickets(data as unknown as Ticket[])
+    try {
+      const records = await backend.list<any>('customer_support')
+      const formatted: Ticket[] = records.map((r) => ({
+        id: r.id,
+        category: r.data?.category || 'General',
+        subject: r.data?.subject || 'No Subject',
+        message: r.data?.message || '',
+        status: r.data?.status || 'open',
+        created_at: r.created_at,
+        user_id: r.owner_id || null,
+      }))
+      setTickets(formatted)
+    } catch (err) {
+      console.error('Error fetching support tickets:', err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const toggleStatus = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'open' ? 'resolved' : 'open'
-    const { error } = await supabase
-      .from('customer_support')
-      .update({ status: newStatus } as any)
-      .eq('id', id)
-
-    if (!error) {
-      setTickets(tickets.map(t => t.id === id ? { ...t, status: newStatus } : t))
+    try {
+      await backend.update('customer_support', id, { status: newStatus })
+      setTickets(tickets.map((t) => (t.id === id ? { ...t, status: newStatus } : t)))
+    } catch (err: any) {
+      alert('Failed to update ticket: ' + (err.message || 'Unknown error'))
     }
   }
 
@@ -105,10 +115,15 @@ export default function AdminSupportPage() {
                 <div key={ticket.id} className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase ${
-                        ticket.category === 'Complaint' ? 'bg-red-50 text-red-700' :
-                        ticket.category === 'Suggestion' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'
-                      }`}>
+                      <span
+                        className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase ${
+                          ticket.category === 'Complaint'
+                            ? 'bg-red-50 text-red-700'
+                            : ticket.category === 'Suggestion'
+                            ? 'bg-indigo-50 text-indigo-700'
+                            : 'bg-emerald-50 text-emerald-700'
+                        }`}
+                      >
                         {ticket.category}
                       </span>
                       <span className="text-xs text-gray-400">{new Date(ticket.created_at).toLocaleString()}</span>
@@ -122,7 +137,9 @@ export default function AdminSupportPage() {
                     <button
                       onClick={() => toggleStatus(ticket.id, ticket.status)}
                       className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
-                        ticket.status === 'resolved' ? 'bg-gray-100 text-gray-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                        ticket.status === 'resolved'
+                          ? 'bg-gray-100 text-gray-600'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
                       }`}
                     >
                       {ticket.status === 'resolved' ? 'Mark as Open' : 'Mark as Resolved'}
