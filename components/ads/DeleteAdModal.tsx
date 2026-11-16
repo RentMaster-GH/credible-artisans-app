@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 import type { Advertisement } from '@/types/advertisement';
 
 interface DeleteAdModalProps {
@@ -28,14 +28,7 @@ export const DeleteAdModal: React.FC<DeleteAdModalProps> = ({
     setError('');
 
     try {
-      const { error: deleteError } = await (supabase.from as any)('ads')
-        .delete()
-        .eq('id', ad.id);
-
-      if (deleteError) {
-        throw deleteError;
-      }
-
+      await backend.remove('ads', ad.id);
       onSuccess(ad.id);
       onClose();
     } catch (err: any) {
@@ -81,4 +74,3 @@ export const DeleteAdModal: React.FC<DeleteAdModalProps> = ({
     </div>
   );
 };
-
