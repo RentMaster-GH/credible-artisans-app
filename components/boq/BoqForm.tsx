@@ -1,9 +1,9 @@
-// components/boq/BoqForm.tsx
 'use client';
 
 import React, { useState } from 'react';
 import { calculateBoqTotals } from '@/lib/boq';
 import { BoqItem } from '@/types/boq';
+import { backend } from '@/lib/backend';
 
 interface Props {
   artisanId: string;
@@ -27,7 +27,7 @@ export const BoqForm: React.FC<Props> = ({ artisanId, onSuccess }) => {
   const handleItemChange = (index: number, field: keyof BoqItem, value: any) => {
     const updated = [...items];
     updated[index] = { ...updated[index], [field]: value };
-    
+
     // Auto calculate item total price
     if (field === 'quantity' || field === 'unit_price') {
       const q = Number(updated[index].quantity || 0);
@@ -55,28 +55,28 @@ export const BoqForm: React.FC<Props> = ({ artisanId, onSuccess }) => {
     setError('');
 
     try {
-      const response = await fetch('/api/boq', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          artisanId,
-          title,
-          client_id: clientId,
-          tax_rate: taxRate,
-          discount_amount: discountAmount,
-          notes,
-          valid_until: validUntil || null,
-          items,
-        }),
-      });
+      const boqNumber = `BOQ-${Date.now().toString().slice(-6)}`;
 
-      const resData = await response.json();
-      if (!response.ok) throw new Error(resData.error || 'Failed to submit BOQ');
+      await backend.create('boqs', {
+        boq_number: boqNumber,
+        artisan_id: artisanId,
+        title,
+        client_id: clientId,
+        client: { full_name: clientId },
+        tax_rate: taxRate,
+        discount_amount: discountAmount,
+        subtotal: totals.subtotal,
+        grand_total: totals.grandTotal,
+        notes,
+        valid_until: validUntil || null,
+        status: 'PENDING',
+        items,
+      });
 
       alert('Bill of Quantities sent to client successfully!');
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to submit BOQ');
     } finally {
       setLoading(false);
     }
@@ -101,13 +101,13 @@ export const BoqForm: React.FC<Props> = ({ artisanId, onSuccess }) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Client User ID *</label>
+          <label className="block text-sm font-medium text-gray-700">Client User ID or Name *</label>
           <input
             type="text"
             required
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            placeholder="Enter Client ID or Email"
+            placeholder="Enter Client ID, Name, or Email"
             className="mt-1 w-full border rounded-md p-2"
           />
         </div>
