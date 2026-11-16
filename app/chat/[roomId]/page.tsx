@@ -3,9 +3,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import { ChatBox } from '@/components/chat/ChatBox';
 import Link from 'next/link';
+import { backend } from '@/lib/backend';
+import { ChatBox } from '@/components/chat/ChatBox';
 
 export default function ChatRoomPage() {
   const params = useParams();
@@ -20,41 +20,39 @@ export default function ChatRoomPage() {
   useEffect(() => {
     async function loadRoomAndUser() {
       try {
-        // 1. Get currently authenticated user from Supabase
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user) {
+        let me: any;
+        try {
+          me = await backend.getMe();
+        } catch {
           setError('Please sign in to access this private chat.');
           setLoading(false);
           return;
         }
 
-        setUserId(user.id);
-        setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User');
+        const payload = me.payload || {};
+        const currentId = payload.sub;
+        const custom = (payload.custom as Record<string, any>) || {};
+        setUserId(currentId);
+        setUserName(custom.full_name || payload.email?.split('@')[0] || 'User');
 
-        // 2. Fetch Chat Room Details & Participant Info (Corrected single call)
-        const { data: room, error: roomError } = await (supabase.from as any)('chat_rooms')
-          .select(`
-            *,
-            artisan:artisan_id (id, full_name, email),
-            client:client_id (id, full_name, email)
-          `)
-          .eq('id', roomId)
-          .single();
+        const rooms = await backend.list<any>('chat_rooms');
+        const roomRecord = rooms.find((r: any) => r.id === roomId);
 
-        if (roomError || !room) {
+        if (!roomRecord) {
           setError('Chat room not found or you do not have permission to access it.');
           setLoading(false);
           return;
         }
 
-        // Determine recipient name dynamically
-        const isArtisan = user.id === room.artisan_id;
-        const otherParty = isArtisan ? room.client : room.artisan;
-        setRecipientName(otherParty?.full_name || otherParty?.email || 'Chat Partner');
-
+        const room = roomRecord.data || roomRecord;
+        const isArtisan = currentId === room.artisan_id;
+        setRecipientName(
+          isArtisan
+            ? room.client_name || 'Client'
+            : room.artisan_name || 'Artisan'
+        );
       } catch (err: any) {
-        setError(err.message);
+        setError(err.message || 'Unable to load chat room.');
       } finally {
         setLoading(false);
       }
@@ -87,8 +85,8 @@ export default function ChatRoomPage() {
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
       <div className="max-w-3xl mx-auto mb-4">
-        <button 
-          onClick={() => window.history.back()} 
+        <button
+          onClick={() => window.history.back()}
           className="text-xs font-semibold text-gray-600 hover:text-gray-900"
         >
           ← Back
@@ -104,4 +102,3 @@ export default function ChatRoomPage() {
     </div>
   );
 }
-
