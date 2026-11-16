@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 export default function VerificationUploadPage() {
@@ -13,33 +13,39 @@ export default function VerificationUploadPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSubmitVerification = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+      const me = await backend.getMe()
+      const userId = me.payload?.sub as string
 
-    if (!user) {
-      router.push('/login')
-      return
-    }
+      if (!userId) {
+        router.push('/login')
+        return
+      }
 
-    const { error } = await (supabase.from as any)('verifications').insert({
-      user_id: user.id,
-      id_type: idType,
-      id_document_url: documentUrl,
-      status: 'pending',
-    } as any)
+      await backend.create('verifications', {
+        user_id: userId,
+        id_type: idType,
+        id_document_url: documentUrl,
+        status: 'pending',
+        submitted_at: new Date().toISOString(),
+      })
 
-    if (error) {
-      setErrorMsg('Failed to submit verification request: ' + error.message)
-    } else {
       setSubmitted(true)
+    } catch (err: any) {
+      if (err.message?.includes('Unauthorized') || err.message?.includes('token')) {
+        router.push('/login')
+        return
+      }
+      setErrorMsg('Failed to submit verification request: ' + (err.message || 'Unknown error'))
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -118,4 +124,3 @@ export default function VerificationUploadPage() {
     </div>
   )
 }
-
