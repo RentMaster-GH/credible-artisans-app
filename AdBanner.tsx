@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 import type { Advertisement } from '@/types/advertisement';
 import { CreateAdModal } from '@/components/ads/CreateAdModal';
 import { DeleteAdModal } from '@/components/ads/DeleteAdModal';
@@ -17,9 +17,13 @@ export const AdBanner: React.FC = () => {
 
   useEffect(() => {
     async function checkUser() {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setCurrentUserId(data.user.id);
+      try {
+        const { payload } = await backend.getMe();
+        if (payload?.sub) {
+          setCurrentUserId(String(payload.sub));
+        }
+      } catch {
+        setCurrentUserId(null);
       }
     }
     checkUser();
@@ -27,15 +31,17 @@ export const AdBanner: React.FC = () => {
 
   const fetchAds = async () => {
     try {
-      const { data, error } = await supabase
-        .from('ads')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+      const records = await backend.list<any>('ads');
+      const activeAds = records
+        .map((r: any) => ({
+          id: r.id,
+          artisan_id: r.owner_id,
+          created_at: r.created_at,
+          ...(r.data || {}),
+        }))
+        .filter((ad: any) => !ad.status || ad.status === 'active');
 
-      if (!error && data) {
-        setAds(data as unknown as Advertisement[]);
-      }
+      setAds(activeAds as Advertisement[]);
     } catch (err) {
       console.error('Failed to fetch sponsor ads:', err);
     } finally {
