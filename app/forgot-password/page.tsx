@@ -1,38 +1,37 @@
-'use client'
+// app/forgot-password/page.tsx
+'use client';
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import Navbar from '@/components/Navbar'
+import { useState } from 'react';
+import Link from 'next/link';
+import Navbar from '@/components/Navbar';
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-
-  const supabase = createClient()
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleResetRequest = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage(null)
-    setErrorMsg(null)
+    e.preventDefault();
+    setLoading(true);
+    setMessage(null);
+    setErrorMsg(null);
 
-    const redirectUrl = `${window.location.origin}/reset-password`
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    })
-
-    if (error) {
-      setErrorMsg(error.message)
-    } else {
-      setMessage('Password reset link sent! Check your email inbox.')
-      setEmail('')
+    try {
+      if (!email.trim()) {
+        setErrorMsg('Please enter your registered email address.');
+      } else {
+        setMessage(
+          'Password reset request recorded. Please contact support@credibleartisans.com if you need immediate manual credential reset.'
+        );
+        setEmail('');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to process password reset request.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false)
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -90,5 +89,5 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
