@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import { createClient } from '@/lib/supabase/client';
+import { backend } from '@/lib/backend';
 
 interface Job {
   id: string;
@@ -30,7 +30,8 @@ const SAMPLE_JOBS: Job[] = [
     currency: '₦',
     status: 'open',
     created_at: new Date().toISOString(),
-    description: 'Looking for a certified electrical engineer/artisan to completely overhaul conduit wiring for a 5-bedroom duplex, install modern LED strip lights, and set up an inverter bypass board.',
+    description:
+      'Looking for a certified electrical engineer/artisan to completely overhaul conduit wiring for a 5-bedroom duplex, install modern LED strip lights, and set up an inverter bypass board.',
   },
   {
     id: 'sample-2',
@@ -42,7 +43,8 @@ const SAMPLE_JOBS: Job[] = [
     currency: '₦',
     status: 'open',
     created_at: new Date().toISOString(),
-    description: 'Need skilled joinery artisans for high-gloss acrylic kitchen cabinets with soft-close hinges and black galaxy granite countertop fitting.',
+    description:
+      'Need skilled joinery artisans for high-gloss acrylic kitchen cabinets with soft-close hinges and black galaxy granite countertop fitting.',
   },
   {
     id: 'sample-3',
@@ -54,13 +56,12 @@ const SAMPLE_JOBS: Job[] = [
     currency: '₦',
     status: 'open',
     created_at: new Date().toISOString(),
-    description: 'Replacement of old porcelain tiles with 60x60 vitreous tiles in 3 bathrooms. Includes installing wall-hung toilets and shower glass panels.',
+    description:
+      'Replacement of old porcelain tiles with 60x60 vitreous tiles in 3 bathrooms. Includes installing wall-hung toilets and shower glass panels.',
   },
 ];
 
 export default function JobMarketplacePage() {
-  const supabase = createClient();
-
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,7 +73,10 @@ export default function JobMarketplacePage() {
   const [bidTimeline, setBidTimeline] = useState<string>('1 Week');
   const [bidCoverLetter, setBidCoverLetter] = useState<string>('');
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
-  const [bidFeedbackMsg, setBidFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [bidFeedbackMsg, setBidFeedbackMsg] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   const categories = ['All', 'Electrical', 'Carpentry', 'Plumbing & Tiling', 'Masonry', 'Painting'];
 
@@ -80,18 +84,27 @@ export default function JobMarketplacePage() {
     async function fetchJobs() {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('jobs')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          setJobs(data as Job[]);
+        const records = await backend.list<any>('jobs');
+        if (records && records.length > 0) {
+          const mappedJobs: Job[] = records.map((rec: any) => ({
+            id: rec.id,
+            title: rec.data?.title || 'Untitled Project',
+            category: rec.data?.category || 'General',
+            location: rec.data?.location || 'Remote / Direct',
+            budget_min: rec.data?.budget_min ?? null,
+            budget_max: rec.data?.budget_max ?? null,
+            currency: rec.data?.currency || '₦',
+            status: rec.data?.status || 'open',
+            created_at: rec.created_at || new Date().toISOString(),
+            description: rec.data?.description || '',
+            client_id: rec.owner_id,
+          }));
+          setJobs(mappedJobs);
         } else {
           setJobs(SAMPLE_JOBS);
         }
       } catch (err) {
-        console.error('Error fetching jobs:', err);
+        console.error('Error fetching jobs from custom backend:', err);
         setJobs(SAMPLE_JOBS);
       } finally {
         setLoading(false);
@@ -99,7 +112,7 @@ export default function JobMarketplacePage() {
     }
 
     fetchJobs();
-  }, [supabase]);
+  }, []);
 
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,26 +122,30 @@ export default function JobMarketplacePage() {
     setBidFeedbackMsg(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
+      let userPayload: any;
+      try {
+        const me = await backend.getMe();
+        userPayload = me.payload;
+      } catch {
         setBidFeedbackMsg({ type: 'error', text: 'Please sign in to submit a proposal.' });
         setIsSubmittingBid(false);
         return;
       }
 
-      const { error } = await (supabase.from as any)('bids').insert([
-        {
-          job_id: selectedJobForBid.id,
-          artisan_id: user.id,
-          amount: Number(bidAmount),
-          proposed_timeline: bidTimeline,
-          cover_letter: bidCoverLetter,
-          status: 'pending',
-        },
-      ]);
+      const custom = (userPayload.custom as Record<string, any>) || {};
 
-      if (error) throw error;
+      await backend.create('bids', {
+        job_id: selectedJobForBid.id,
+        job_title: selectedJobForBid.title,
+        job_currency: selectedJobForBid.currency || '₦',
+        job_location: selectedJobForBid.location,
+        artisan_id: userPayload.sub,
+        artisan_name: custom.full_name || 'Professional Artisan',
+        amount: Number(bidAmount),
+        proposed_timeline: bidTimeline,
+        cover_letter: bidCoverLetter,
+        status: 'pending',
+      });
 
       setBidFeedbackMsg({ type: 'success', text: 'Your proposal was submitted successfully!' });
       setTimeout(() => {
@@ -145,7 +162,9 @@ export default function JobMarketplacePage() {
   };
 
   const filteredJobs = jobs.filter((job) => {
-    const matchesCategory = selectedCategory === 'All' || job.category?.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesCategory =
+      selectedCategory === 'All' ||
+      job.category?.toLowerCase() === selectedCategory.toLowerCase();
     const matchesSearch =
       job.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -158,8 +177,7 @@ export default function JobMarketplacePage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        
-        {/* HERO BANNER - Exact Dashboard Style */}
+        {/* HERO BANNER */}
         <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-400/20">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -249,7 +267,9 @@ export default function JobMarketplacePage() {
         {loading ? (
           <div className="bg-gray-900/80 border border-gray-800 p-12 rounded-2xl text-center shadow-lg">
             <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Loading marketplace jobs...</p>
+            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
+              Loading marketplace jobs...
+            </p>
           </div>
         ) : filteredJobs.length === 0 ? (
           <div className="bg-gray-900/80 border border-gray-800 p-12 text-center rounded-2xl shadow-lg space-y-3">
@@ -272,7 +292,9 @@ export default function JobMarketplacePage() {
                       <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30 uppercase">
                         {job.category || 'General'}
                       </span>
-                      <span className="text-xs text-gray-400">• Posted {new Date(job.created_at).toLocaleDateString()}</span>
+                      <span className="text-xs text-gray-400">
+                        • Posted {new Date(job.created_at).toLocaleDateString()}
+                      </span>
                     </div>
 
                     <h2 className="text-xl font-black text-white group-hover:text-amber-400 transition">
@@ -295,7 +317,9 @@ export default function JobMarketplacePage() {
                       <p className="text-xl font-black text-amber-400">
                         {job.currency || '₦'}{' '}
                         {job.budget_min
-                          ? `${Number(job.budget_min).toLocaleString()}${job.budget_max ? ` - ${Number(job.budget_max).toLocaleString()}` : '+'}`
+                          ? `${Number(job.budget_min).toLocaleString()}${
+                              job.budget_max ? ` - ${Number(job.budget_max).toLocaleString()}` : '+'
+                            }`
                           : 'Negotiable'}
                       </p>
                     </div>
@@ -315,7 +339,6 @@ export default function JobMarketplacePage() {
             ))}
           </div>
         )}
-
       </main>
 
       {/* PROPOSAL MODAL */}
@@ -414,7 +437,6 @@ export default function JobMarketplacePage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
