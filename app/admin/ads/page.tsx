@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { backend } from '@/lib/backend'
 import Navbar from '@/components/Navbar'
 
 interface Ad {
@@ -14,13 +14,11 @@ interface Ad {
   created_at: string
 }
 
-const DEVELOPER_EMAIL = 'your-email@example.com' // Replace with your actual email if restricted
-
 export default function AdminAdsPage() {
   const [ads, setAds] = useState<Ad[]>([])
   const [loading, setLoading] = useState(true)
   const [authorized, setAuthorized] = useState(false)
-  
+
   // Form state
   const [title, setTitle] = useState('')
   const [imageUrl, setImageUrl] = useState('')
@@ -28,34 +26,37 @@ export default function AdminAdsPage() {
   const [placement, setPlacement] = useState('sidebar')
   const [submitting, setSubmitting] = useState(false)
 
-  const supabase = createClient()
-
   const fetchAds = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('ads')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setAds(data as unknown as Ad[])
+    try {
+      const records = await backend.list<any>('ads')
+      const formatted: Ad[] = records.map((rec) => ({
+        id: rec.id,
+        business_name: rec.data?.business_name || rec.data?.shop_name || 'Sponsored Ad',
+        creative_url: rec.data?.creative_url || rec.data?.image_url || '',
+        destination_url: rec.data?.destination_url || '',
+        ad_slot: rec.data?.ad_slot || 'sidebar',
+        status: rec.data?.status || 'active',
+        created_at: rec.created_at,
+      }))
+      setAds(formatted)
+    } catch (err) {
+      console.error('Failed to fetch ads:', err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => {
     const checkUserAndFetchAds = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // Allow access if logged in user exists
-      if (!user) {
+      try {
+        await backend.getMe()
+        setAuthorized(true)
+        await fetchAds()
+      } catch {
         setAuthorized(false)
         setLoading(false)
-        return
       }
-
-      setAuthorized(true)
-      fetchAds()
     }
 
     checkUserAndFetchAds()
@@ -65,47 +66,45 @@ export default function AdminAdsPage() {
     e.preventDefault()
     setSubmitting(true)
 
-    const { error } = await ((supabase.from as any)('ads') as any).insert({
-      business_name: title,
-      creative_url: imageUrl,
-      destination_url: targetUrl,
-      ad_slot: placement,
-      status: 'active',
-    })
-
-    if (error) {
-      alert('Error creating ad: ' + error.message)
-    } else {
+    try {
+      await backend.create('ads', {
+        business_name: title,
+        shop_name: title,
+        creative_url: imageUrl,
+        image_url: imageUrl,
+        destination_url: targetUrl,
+        ad_slot: placement,
+        status: 'active',
+      })
       setTitle('')
       setImageUrl('')
       setTargetUrl('')
-      fetchAds()
+      await fetchAds()
+    } catch (err: any) {
+      alert('Error creating ad: ' + (err.message || 'Failed to publish ad'))
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   const toggleAdStatus = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'paused' : 'active'
-    const { error } = await supabase
-      .from('ads')
-      .update({ status: newStatus })
-      .eq('id', id)
-
-    if (!error) {
-      setAds(ads.map(ad => ad.id === id ? { ...ad, status: newStatus } : ad))
+    try {
+      await backend.update('ads', id, { status: newStatus })
+      setAds(ads.map((ad) => (ad.id === id ? { ...ad, status: newStatus } : ad)))
+    } catch (err: any) {
+      alert('Failed to update ad status: ' + err.message)
     }
   }
 
   const deleteAd = async (id: string) => {
     if (!confirm('Are you sure you want to delete this ad?')) return
 
-    const { error } = await supabase
-      .from('ads')
-      .delete()
-      .eq('id', id)
-
-    if (!error) {
-      setAds(ads.filter(ad => ad.id !== id))
+    try {
+      await backend.remove('ads', id)
+      setAds(ads.filter((ad) => ad.id !== id))
+    } catch (err: any) {
+      alert('Failed to delete ad: ' + err.message)
     }
   }
 
@@ -143,7 +142,7 @@ export default function AdminAdsPage() {
         {/* Create Ad Form */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm mb-10">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Post a New Ad</h2>
-          
+
           <form onSubmit={handleCreateAd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Ad Title / Brand Name</label>
@@ -252,9 +251,7 @@ export default function AdminAdsPage() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   )
 }
-
