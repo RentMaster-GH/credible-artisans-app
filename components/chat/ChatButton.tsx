@@ -1,8 +1,8 @@
-// components/chat/ChatButton.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from 'next/navigation';
+import { backend } from '@/lib/backend';
 
 interface Props {
   artisanId: string;
@@ -18,27 +18,30 @@ export const ChatButton: React.FC<Props> = ({
   className = 'bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2 rounded-lg shadow transition disabled:opacity-50',
 }) => {
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleOpenChat = async () => {
     setLoading(true);
     try {
-      // Automatically creates or finds the private chat room between this artisan and client
-      const { data: room, error } = await (supabase.from as any)('chat_rooms')
-        .upsert(
-          { artisan_id: artisanId, client_id: clientId },
-          { onConflict: 'artisan_id,client_id' }
-        )
-        .select('id')
-        .single();
+      const rooms = await backend.list<any>('chat_rooms');
+      let room = rooms.find(
+        (r) =>
+          (r.data?.artisan_id === artisanId && r.data?.client_id === clientId) ||
+          (r.artisan_id === artisanId && r.client_id === clientId)
+      );
 
-      if (error) throw error;
+      if (!room) {
+        room = await backend.create<any>('chat_rooms', {
+          artisan_id: artisanId,
+          client_id: clientId,
+        });
+      }
 
-      if (room) {
-        // Automatically redirects the user straight into the chat room
-        window.location.href = `/chat/${room.id}`;
+      if (room?.id) {
+        router.push(`/chat/${room.id}`);
       }
     } catch (err: any) {
-      alert('Failed to open chat: ' + err.message);
+      alert('Failed to open chat: ' + (err.message || 'Please sign in first.'));
     } finally {
       setLoading(false);
     }
