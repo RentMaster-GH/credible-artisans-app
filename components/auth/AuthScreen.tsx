@@ -1,13 +1,12 @@
-// components/auth/AuthScreen.tsx
 'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdBanner } from '@/AdBanner';
-import { supabase } from '@/lib/supabaseClient';
+import { backend } from '@/lib/backend';
 import { DonateModal } from '@/components/donation/DonateModal';
-import { InPageChatModal } from '@/components/chat/InPageChatModal'; // <-- IMPORT
+import { InPageChatModal } from '@/components/chat/InPageChatModal';
 
 const GLOBAL_CITIES = [
   'Accra, Ghana',
@@ -41,12 +40,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isDonateOpen, setIsDonateOpen] = useState(false);
 
-  // In-Page Chat State
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('Client');
@@ -57,35 +55,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Handle Contact Artisan directly inside the current page
   const handleContactArtisanClick = async (artisan: any) => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      setError('');
 
-      if (!user) {
+      let meData: any;
+      try {
+        meData = await backend.getMe();
+      } catch {
         setIsSignUp(true);
         setError('Please sign up or sign in to open a live chat and video call with artisans.');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
-      // Create or fetch private chat room between client and artisan
-      const { data: room, error: roomError } = await (supabase.from as any)('chat_rooms')
-        .upsert(
-          { artisan_id: artisan.id, client_id: user.id },
-          { onConflict: 'artisan_id,client_id' }
-        )
-        .select('id')
-        .single();
+      const user = meData.payload;
+      const existingRooms = await backend.list<any>('chat_rooms');
+      let room = existingRooms.find(
+        (r) => r.data?.artisan_id === artisan.id && r.data?.client_id === user.sub
+      );
 
-      if (roomError) throw roomError;
+      if (!room) {
+        room = await backend.create<any>('chat_rooms', {
+          artisan_id: artisan.id,
+          artisan_name: artisan.name,
+          client_id: user.sub,
+        });
+      }
 
-      if (room) {
-        setCurrentUserId(user.id);
-        setCurrentUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'Client');
+      if (room?.id) {
+        setCurrentUserId(user.sub);
+        setCurrentUserName(user.custom?.full_name || 'Client');
         setRecipientName(artisan.name);
-        setActiveRoomId(room.id); // 🌟 Opens floating chat window directly on the same page!
+        setActiveRoomId(room.id);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to connect live chat.');
@@ -95,17 +98,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
   };
 
   const handleGoogleSignIn = async () => {
-    try {
-      const { error: googleError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-        },
-      });
-      if (googleError) throw googleError;
-    } catch (err: any) {
-      setError(err.message || 'Google sign in failed.');
-    }
+    setError('Google Sign-In is disabled on the custom backend. Please use email and password below.');
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -127,29 +120,25 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
     }
 
     try {
+      let activeRole: string = role;
+
       if (isSignUp) {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName, role: role },
-          },
+        const user = await backend.register(email, password, {
+          full_name: fullName,
+          account_type: role,
         });
-        if (signUpError) throw signUpError;
+        activeRole = (user.custom_claims?.account_type as string) || role;
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signInError) throw signInError;
+        const session = await backend.login(email, password);
+        const custom = (session.payload?.custom as Record<string, any>) || {};
+        activeRole = custom.account_type || role;
       }
 
-      const targetPath = role === 'artisan' ? '/artisan/boq' : '/dashboard';
+      const targetPath = activeRole === 'artisan' ? '/artisan/boq' : '/dashboard';
       router.push(targetPath);
       router.refresh();
-
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Authentication failed.');
     } finally {
       setLoading(false);
     }
