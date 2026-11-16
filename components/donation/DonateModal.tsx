@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { backend } from '@/lib/backend';
 
 interface Props {
   isOpen: boolean;
@@ -68,11 +69,22 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
       const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample';
       const referenceCode = 'DONATE_' + Math.floor(Math.random() * 1000000000 + 1);
 
-      // Clean phone format for receipt
       const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
       const receiptEmail = `${cleanPhone || 'supporter'}@credibleartisans.com`;
 
-      (window as any).onDonateSuccess = function () {
+      (window as any).onDonateSuccess = async function (response: any) {
+        try {
+          await backend.create('donations', {
+            reference: response?.reference || referenceCode,
+            donor_name: donorName || 'Anonymous Supporter',
+            phone,
+            amount: finalAmount,
+            currency,
+            status: 'completed',
+          });
+        } catch {
+          // Ignore backend logging error if donor is not signed in
+        }
         setDonated(true);
         setLoading(false);
       };
@@ -84,7 +96,7 @@ export const DonateModal: React.FC<Props> = ({ isOpen, onClose }) => {
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
         email: receiptEmail,
-        amount: Math.round(finalAmount * 100), // Pesewas or Cents
+        amount: Math.round(finalAmount * 100),
         currency: currency,
         ref: referenceCode,
         callback: (window as any).onDonateSuccess,
