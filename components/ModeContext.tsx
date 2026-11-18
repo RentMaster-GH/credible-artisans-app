@@ -29,7 +29,7 @@ export function ModeProvider({ children }: { children: React.ReactNode }) {
 
     // Redirect to respective dashboard/portal home page
     if (mode === 'client') {
-      router.push('/client/dashboard'); // or /client
+      router.push('/signup?role=client'); // or /client
     } else {
       router.push('/artisan/dashboard'); // or /artisan
     }

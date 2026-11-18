@@ -32,7 +32,7 @@ export default function LandingPage() {
             Verified electricians, plumbers, carpenters, masons. Chat instantly, get a BOQ, pay securely. No more ghosting.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/client/dashboard" className="h-12 px-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold inline-flex items-center justify-center gap-2 leading-none">
+            <Link href="/signup?role=client" className="h-12 px-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold inline-flex items-center justify-center gap-2 leading-none">
               <Search className="w-4 h-4" /> Find an Artisan <ArrowRight className="w-4 h-4" />
             </Link>
             <Link href="/signup" className="h-12 px-7 rounded-full bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/10 text-sm font-bold inline-flex items-center justify-center gap-2 leading-none">
