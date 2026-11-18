@@ -162,8 +162,15 @@ export class CustomBackendClient {
   }
 
   async list<T = Record<string, unknown>>(collection: string) {
-    const res = await this.request<{ records: T[] }>(`/data/${collection}`);
-    return res.records;
+    try {
+      const res = await this.request<{ records: T[] }>(`/data/${collection}`);
+      return res.records || [];
+    } catch (err: any) {
+      if (!this.getAccessToken() && String(err?.message || "").toLowerCase().includes("authorization")) {
+        return [];
+      }
+      throw err;
+    }
   }
 
   async update<T = Record<string, unknown>>(
