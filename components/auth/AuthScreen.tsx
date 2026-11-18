@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AdBanner } from '@/AdBanner';
 import { backend } from '@/lib/backend';
 import { DonateModal } from '@/components/donation/DonateModal';
 import { InPageChatModal } from '@/components/chat/InPageChatModal';
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
 
 const GLOBAL_CITIES = [
   'Accra, Ghana',
@@ -55,6 +61,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const urlRole = params.get('role');
+    if (urlRole === 'artisan' || urlRole === 'client') {
+      setRole(urlRole);
+    }
+
+    if (!document.getElementById('google-gsi-script')) {
+      const script = document.createElement('script');
+      script.id = 'google-gsi-script';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   const handleContactArtisanClick = async (artisan: any) => {
     try {
       setLoading(true);
@@ -97,8 +121,70 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setError('Google Sign-In is disabled on the custom backend. Please use email and password below.');
+  const handleGoogleCredentialResponse = async (response: any) => {
+    const idToken = response?.credential;
+    if (!idToken) {
+      setError('Google Sign-In did not return a valid credential.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.credibleartisans.com').replace(/\/$/, '');
+      const appId = process.env.NEXT_PUBLIC_APP_ID || 'credible-artisans';
+
+      const res = await fetch(`${baseUrl}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken,
+          app_id: appId,
+          custom_claims: { account_type: role },
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Google authentication failed.');
+      }
+
+      localStorage.setItem(`cb_${appId}_access`, data.accessToken);
+      localStorage.setItem(`cb_${appId}_refresh`, data.refreshToken);
+
+      const activeRole = (data.user?.custom_claims?.account_type as string) || role;
+      const targetPath = activeRole === 'artisan' ? '/artisan/boq' : '/dashboard';
+      router.push(targetPath);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || 'Google Sign-In failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = () => {
+    setError('');
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setError('Google Client ID is missing. Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to your environment variables.');
+      return;
+    }
+
+    if (!window.google?.accounts?.id) {
+      setError('Google Sign-In is still loading. Please wait a second and click Continue with Google again.');
+      return;
+    }
+
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleCredentialResponse,
+    });
+    window.google.accounts.id.prompt((notification: any) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        setError('Google popup was blocked or dismissed. Please allow popups for this site and try again.');
+      }
+    });
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -146,10 +232,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-gray-900 text-white font-sans">
-      
       {/* LEFT COLUMN: Global Showcase */}
       <div className="lg:col-span-7 relative hidden lg:flex flex-col justify-between p-12 bg-cover bg-center overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-10000 hover:scale-100"
           style={{
             backgroundImage: `url('https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=1200')`,
@@ -258,7 +343,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
 
       {/* RIGHT COLUMN: Auth Form & Self-Service Sponsor Portal */}
       <div className="lg:col-span-5 bg-white text-gray-900 flex flex-col justify-between p-6 sm:p-10 overflow-y-auto">
-        
         <div className="flex justify-between items-center mb-6">
           <Link href="/" className="lg:hidden flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-black text-sm">
@@ -287,7 +371,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
 
         {/* Form Container */}
         <div className="max-w-md w-full mx-auto space-y-6 my-auto">
-          
           <div>
             <h2 className="text-3xl font-black text-gray-900 tracking-tight">
               {isSignUp ? 'Create Your Account' : 'Welcome Back'}
@@ -301,7 +384,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
           <button
             type="button"
             onClick={handleGoogleSignIn}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-xl shadow-sm transition text-sm"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-xl shadow-sm transition text-sm disabled:opacity-50"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -411,7 +495,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
                   >
                     {showConfirmPassword ? '🙈' : '👁️'}
                   </button>
-
                 </div>
               </div>
             )}
@@ -451,7 +534,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ initialIsSignUp = false 
           recipientName={recipientName}
         />
       )}
-
     </div>
   );
 };
