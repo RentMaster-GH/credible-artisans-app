@@ -32,10 +32,10 @@ export default function UserMenu() {
           </>
         ) : (
           <>
-            <a href="/signup?role=client" className="block p-2 hover:bg-gray-100 rounded">
+            <a href="/dashboard" className="block p-2 hover:bg-gray-100 rounded">
               📊 Client Dashboard
             </a>
-            <a href="/client/jobs/new" className="block p-2 hover:bg-gray-100 rounded">
+            <a href="/jobs/new" className="block p-2 hover:bg-gray-100 rounded">
               📝 Post a New Project
             </a>
             <a href="/client/settings" className="block p-2 hover:bg-gray-100 rounded">
