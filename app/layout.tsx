@@ -1,3 +1,4 @@
+import { SovereignSsoBadge } from "@/components/SovereignSsoBadge";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ModeProvider } from "@/components/ModeContext"; // Import the ModeProvider
@@ -17,6 +18,7 @@ export default function RootLayout({
       <body className="antialiased bg-gray-50 text-gray-900">
         <ModeProvider>
           {children}
+          <SovereignSsoBadge />
         </ModeProvider>
       </body>
     </html>
